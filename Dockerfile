@@ -29,7 +29,7 @@ RUN chmod 0555 ./scripts/container-entrypoint.sh \
     && chown -R caseops:caseops /opt/caseops
 
 USER 10001:10001
-EXPOSE 8080
+EXPOSE 8080 8081
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=2)"]

@@ -5,7 +5,12 @@ from datetime import date, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .infrastructure.models import CaseRecord, PolicyRecord
+from .infrastructure.models import (
+    CaseRecord,
+    DocumentAliasRecord,
+    PolicyRecord,
+    SourceDocumentRecord,
+)
 
 
 def seed_reference_data(session: Session) -> None:
@@ -53,5 +58,43 @@ def seed_reference_data(session: Session) -> None:
                     "LOSS_STATEMENT",
                     "IDENTITY_DOCUMENT",
                 ],
+            )
+        )
+
+    source_document = session.scalar(
+        select(SourceDocumentRecord).where(
+            SourceDocumentRecord.tenant_id == tenant_id,
+            SourceDocumentRecord.document_id == "DOC-C102-003",
+        )
+    )
+    if source_document is None:
+        session.add(
+            SourceDocumentRecord(
+                tenant_id=tenant_id,
+                document_id="DOC-C102-003",
+                case_id="C-102",
+                source_label="道路交通事故认定书",
+                canonical_code=None,
+                source_ref="evidence://C-102/DOC-C102-003@1",
+                captured_at=datetime.fromisoformat("2026-07-18T09:24:00+08:00"),
+            )
+        )
+
+    alias = session.scalar(
+        select(DocumentAliasRecord).where(
+            DocumentAliasRecord.tenant_id == tenant_id,
+            DocumentAliasRecord.normalized_label == "道路交通事故认定书",
+            DocumentAliasRecord.rule_version == "2026.1",
+        )
+    )
+    if alias is None:
+        session.add(
+            DocumentAliasRecord(
+                tenant_id=tenant_id,
+                normalized_label="道路交通事故认定书",
+                canonical_code="ACCIDENT_CERTIFICATE",
+                rule_version="2026.1",
+                confidence=1.0,
+                active=True,
             )
         )

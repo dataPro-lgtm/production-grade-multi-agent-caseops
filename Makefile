@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install migrate seed run test lint typecheck security verify compose-up compose-down
+.PHONY: install migrate seed run test lint typecheck security verify acceptance compose-up compose-down
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -29,6 +29,9 @@ security:
 	$(PYTHON) -m pip_audit
 
 verify: lint typecheck test
+
+acceptance:
+	./scripts/acceptance-chapter-02.sh
 
 compose-up:
 	docker compose up --build -d

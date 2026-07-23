@@ -60,7 +60,9 @@ jobs:
           alembic current
 
       - name: Static security scan
-        run: bandit -q -r src
+        run: |
+          bandit -q -r src
+          pip-audit
 
       - name: Build runtime image
         run: docker build --tag caseops:${{ github.sha }} .

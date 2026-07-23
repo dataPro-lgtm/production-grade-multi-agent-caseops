@@ -12,6 +12,8 @@ class ApiMetrics:
     requests: Counter
     latency: Histogram
     investigations: Counter
+    agent_runs: Counter
+    agent_steps: Histogram
 
     @classmethod
     def create(cls) -> ApiMetrics:
@@ -34,6 +36,18 @@ class ApiMetrics:
                 "caseops_investigations_total",
                 "Case investigations by outcome and replay status",
                 ("decision_code", "replayed"),
+                registry=registry,
+            ),
+            agent_runs=Counter(
+                "caseops_agent_runs_total",
+                "Controlled Agent runs by terminal status and planner",
+                ("status", "planner", "replayed"),
+                registry=registry,
+            ),
+            agent_steps=Histogram(
+                "caseops_agent_run_steps",
+                "Tool proposal steps per controlled Agent run",
+                buckets=(1, 2, 3, 4, 5, 8, 13, 21),
                 registry=registry,
             ),
         )

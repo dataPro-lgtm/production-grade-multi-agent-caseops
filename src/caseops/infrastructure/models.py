@@ -5,8 +5,11 @@ from uuid import uuid4
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
+    Float,
+    ForeignKey,
     Index,
     Integer,
     String,
@@ -155,3 +158,166 @@ class OutboxEventRecord(Base):
         nullable=True,
     )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class SourceDocumentRecord(Base):
+    __tablename__ = "source_documents"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "document_id",
+            name="uq_source_documents_tenant_document",
+        ),
+        Index(
+            "ix_source_documents_tenant_case",
+            "tenant_id",
+            "case_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    document_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_label: Mapped[str] = mapped_column(String(240), nullable=False)
+    canonical_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    source_ref: Mapped[str] = mapped_column(String(500), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class DocumentAliasRecord(Base):
+    __tablename__ = "document_aliases"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "normalized_label",
+            "rule_version",
+            name="uq_document_aliases_tenant_label_version",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    normalized_label: Mapped[str] = mapped_column(String(240), nullable=False)
+    canonical_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class AgentRunRecord(Base):
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_agent_runs_tenant_idempotency",
+        ),
+        Index("ix_agent_runs_tenant_case", "tenant_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    planner_kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    step_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_steps: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    final_result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    stop_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class AgentCheckpointRecord(Base):
+    __tablename__ = "agent_checkpoints"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "sequence",
+            name="uq_agent_checkpoints_run_sequence",
+        ),
+        Index("ix_agent_checkpoints_tenant_run", "tenant_id", "run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class ToolExecutionRecord(Base):
+    __tablename__ = "tool_executions"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "tool_call_id",
+            name="uq_tool_executions_run_call",
+        ),
+        Index("ix_tool_executions_tenant_run", "tenant_id", "run_id"),
+        Index("ix_tool_executions_fingerprint", "run_id", "action_fingerprint"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    tool_call_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    arguments: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    arguments_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    action_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

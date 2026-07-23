@@ -83,7 +83,8 @@ def create_app(
         version=resolved_settings.service_version,
         description=(
             "Production-oriented case investigation reference service. "
-            "Slice 0 is deterministic and draft-only."
+            "Slice 0 provides a deterministic baseline; Slice 1 adds a controlled "
+            "tool state machine and governed MCP execution."
         ),
         lifespan=lifespan,
     )

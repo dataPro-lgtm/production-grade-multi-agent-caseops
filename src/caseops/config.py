@@ -16,13 +16,29 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     service_name: str = "caseops-api"
-    service_version: str = "0.1.0"
+    service_version: str = "0.2.0"
     database_url: str = "sqlite+pysqlite:///./caseops.db"
     api_keys: dict[str, str] = Field(
         default_factory=lambda: {"caseops-local-dev-key": "tenant-demo"}
     )
     log_level: str = "INFO"
     expose_metrics: bool = True
+    agent_planner: Literal["conformance", "openai"] = "conformance"
+    agent_tool_transport: Literal["direct", "mcp"] = "direct"
+    agent_max_steps: int = Field(default=8, ge=1, le=32)
+    agent_repeat_limit: int = Field(default=2, ge=1, le=5)
+    agent_tool_timeout_seconds: float = Field(default=8.0, gt=0, le=60)
+    openai_api_key: str | None = None
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_model: str = "gpt-5.6-terra"
+    openai_reasoning_effort: Literal["none", "low", "medium", "high"] = "low"
+    mcp_url: str = "http://127.0.0.1:8081/mcp"
+    mcp_host: str = "127.0.0.1"
+    mcp_port: int = Field(default=8081, ge=1, le=65535)
+    mcp_resource: str = "http://127.0.0.1:8081/mcp"
+    delegation_issuer: str = "https://caseops.local"
+    delegation_signing_key: str = "caseops-local-delegation-key-change-me-32-bytes"
+    delegation_token_ttl_seconds: int = Field(default=120, ge=30, le=600)
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> Settings:
@@ -31,8 +47,12 @@ class Settings(BaseSettings):
                 raise ValueError("production 环境禁止使用 SQLite")
             if "caseops-local-dev-key" in self.api_keys:
                 raise ValueError("production 环境禁止使用本地开发 API Key")
+            if self.delegation_signing_key.startswith("caseops-local-"):
+                raise ValueError("production 环境必须配置独立的任务令牌签名密钥")
         if not self.api_keys:
             raise ValueError("至少配置一个 API Key 到租户的映射")
+        if self.agent_planner == "openai" and not self.openai_api_key:
+            raise ValueError("使用 openai planner 时必须配置 CASEOPS_OPENAI_API_KEY")
         return self
 
 

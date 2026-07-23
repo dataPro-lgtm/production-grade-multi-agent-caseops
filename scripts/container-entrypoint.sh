@@ -1,8 +1,14 @@
 #!/bin/sh
 set -eu
 
-alembic upgrade head
-caseops seed
+if [ "${CASEOPS_RUN_MIGRATIONS:-true}" = "true" ]; then
+  alembic upgrade head
+  caseops seed
+fi
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 
 exec uvicorn caseops.api.app:app \
   --host 0.0.0.0 \

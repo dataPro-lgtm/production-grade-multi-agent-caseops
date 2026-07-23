@@ -27,6 +27,14 @@ from .infrastructure.repositories import (
 class Principal:
     tenant_id: str
     actor_id: str
+    scopes: frozenset[str] = frozenset(
+        {
+            "case:read",
+            "policy:read",
+            "document:read",
+            "document:resolve",
+        }
+    )
 
 
 @dataclass(frozen=True, slots=True)
