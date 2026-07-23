@@ -17,6 +17,8 @@ from caseops.infrastructure.models import (
     AgentRunRecord,
     AuditEventRecord,
     Base,
+    CollaborationRunRecord,
+    DelegatedTaskRecord,
     InvestigationRecord,
     OutboxEventRecord,
     ToolExecutionRecord,
@@ -282,6 +284,60 @@ class ApiIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payload["status"], "completed")
         self.assertEqual(payload["step_count"], 5)
 
+    async def test_multi_agent_collaboration_persists_tasks_join_and_events(
+        self,
+    ) -> None:
+        response = await self._run_collaboration("book-ch03-c102-0001")
+
+        self.assertEqual(response.status_code, 201, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "completed")
+        self.assertFalse(payload["replayed"])
+        self.assertEqual(
+            payload["result"]["outcome"],
+            "COMPLETE_WITH_REVIEW_REQUIRED",
+        )
+        self.assertEqual(payload["result"]["side_effect"], "none")
+        self.assertEqual(
+            payload["result"]["join"]["accepted_specialists"],
+            ["coverage", "document", "risk"],
+        )
+        self.assertEqual(len(payload["tasks"]), 3)
+        self.assertEqual(
+            {task["status"] for task in payload["tasks"]},
+            {"succeeded"},
+        )
+
+        with self.factory() as session:
+            self.assertEqual(
+                session.scalar(select(func.count(CollaborationRunRecord.id))),
+                1,
+            )
+            self.assertEqual(
+                session.scalar(select(func.count(DelegatedTaskRecord.id))),
+                3,
+            )
+            self.assertEqual(
+                session.scalar(select(func.count(OutboxEventRecord.id))),
+                5,
+            )
+
+    async def test_collaboration_idempotency_does_not_redispatch_agents(
+        self,
+    ) -> None:
+        first = await self._run_collaboration("book-ch03-c102-0002")
+        second = await self._run_collaboration("book-ch03-c102-0002")
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.json()["replayed"])
+        self.assertEqual(first.json()["run_id"], second.json()["run_id"])
+        with self.factory() as session:
+            self.assertEqual(
+                session.scalar(select(func.count(DelegatedTaskRecord.id))),
+                3,
+            )
+
     async def _investigate(
         self,
         idempotency_key: str,
@@ -307,6 +363,22 @@ class ApiIntegrationTest(unittest.IsolatedAsyncioTestCase):
                 "X-Request-ID": f"request-{idempotency_key}",
             },
             json={"goal": "判断案件材料是否满足其绑定规则，并给出可追溯结论。"},
+        )
+
+    async def _run_collaboration(self, idempotency_key: str) -> httpx.Response:
+        return await self.client.post(
+            "/v1/cases/C-102/collaboration-runs",
+            headers={
+                "X-API-Key": "integration-test-key",
+                "Idempotency-Key": idempotency_key,
+                "X-Request-ID": f"request-{idempotency_key}",
+            },
+            json={
+                "goal": (
+                    "并行核对案件规则、材料完整性与风险信号，"
+                    "通过证据合同形成可追溯的协作结论。"
+                )
+            },
         )
 
 

@@ -21,6 +21,7 @@ from .tools import (
     GET_CASE,
     GET_POLICY,
     LIST_DOCUMENTS,
+    LIST_RISK_SIGNALS,
     RESOLVE_ALIAS,
     execute_database_tool,
 )
@@ -114,6 +115,14 @@ def create_mcp_server(
             "document:resolve",
         )
 
+    def risk_signals(case_id: str) -> dict[str, Any]:
+        return _execute(
+            factory,
+            LIST_RISK_SIGNALS,
+            {"case_id": case_id},
+            "risk:read",
+        )
+
     register(
         GET_CASE,
         "Read case snapshot",
@@ -137,6 +146,12 @@ def create_mcp_server(
         "Resolve document alias",
         "Resolve one document label with a governed, versioned alias rule.",
         resolve_alias,
+    )
+    register(
+        LIST_RISK_SIGNALS,
+        "List governed risk signals",
+        "List structured risk signals without authorizing an operational action.",
+        risk_signals,
     )
     return server
 

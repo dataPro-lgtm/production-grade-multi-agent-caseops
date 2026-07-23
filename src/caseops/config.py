@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     service_name: str = "caseops-api"
-    service_version: str = "0.2.0"
+    service_version: str = "0.3.0"
     database_url: str = "sqlite+pysqlite:///./caseops.db"
     api_keys: dict[str, str] = Field(
         default_factory=lambda: {"caseops-local-dev-key": "tenant-demo"}
@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     delegation_issuer: str = "https://caseops.local"
     delegation_signing_key: str = "caseops-local-delegation-key-change-me-32-bytes"
     delegation_token_ttl_seconds: int = Field(default=120, ge=30, le=600)
+    collaboration_transport: Literal["direct", "a2a"] = "direct"
+    collaboration_task_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    a2a_url: str = "http://127.0.0.1:8082"
+    a2a_host: str = "127.0.0.1"
+    a2a_port: int = Field(default=8082, ge=1, le=65535)
+    a2a_resource: str = "http://127.0.0.1:8082/a2a/rest"
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> Settings:

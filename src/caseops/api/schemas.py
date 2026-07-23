@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from caseops.collaboration.contracts import CollaborationResult, JoinPolicy
+
 
 class InvestigationCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -104,6 +106,55 @@ class AgentRunResponse(BaseModel):
     step_count: int
     result: AgentResultResponse | None
     stop_reason: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class CollaborationRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    goal: str = Field(
+        default=(
+            "并行核对案件规则、材料完整性与风险信号，通过证据合同形成可追溯的协作结论。"
+        ),
+        min_length=10,
+        max_length=500,
+    )
+    join_policy: JoinPolicy = Field(default_factory=JoinPolicy)
+
+
+class DelegatedTaskResponse(BaseModel):
+    task_id: str
+    specialist_id: Literal["coverage", "document", "risk"]
+    status: Literal[
+        "planned",
+        "submitted",
+        "working",
+        "succeeded",
+        "failed",
+        "timed_out",
+        "rejected",
+    ]
+    attempt_count: int
+    result: dict[str, object] | None
+    error: dict[str, object] | None
+
+
+class CollaborationRunResponse(BaseModel):
+    run_id: str
+    idempotency_key: str
+    status: Literal[
+        "created",
+        "dispatching",
+        "joining",
+        "completed",
+        "partial",
+        "needs_human",
+        "failed",
+    ]
+    replayed: bool
+    result: CollaborationResult
+    tasks: tuple[DelegatedTaskResponse, ...]
     created_at: datetime
     completed_at: datetime | None
 

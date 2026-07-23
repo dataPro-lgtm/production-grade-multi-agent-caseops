@@ -215,6 +215,121 @@ class DocumentAliasRecord(Base):
     )
 
 
+class CaseRiskSignalRecord(Base):
+    __tablename__ = "case_risk_signals"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "case_id",
+            "signal_code",
+            "rule_version",
+            name="uq_case_risk_signals_tenant_case_signal_version",
+        ),
+        Index("ix_case_risk_signals_tenant_case", "tenant_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    signal_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    signal_value: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    severity: Mapped[str] = mapped_column(String(40), nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_ref: Mapped[str] = mapped_column(String(500), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class CollaborationRunRecord(Base):
+    __tablename__ = "collaboration_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_collaboration_runs_tenant_idempotency",
+        ),
+        Index("ix_collaboration_runs_tenant_case", "tenant_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    join_policy: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    expected_specialists: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    final_result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class DelegatedTaskRecord(Base):
+    __tablename__ = "delegated_tasks"
+    __table_args__ = (
+        UniqueConstraint(
+            "run_id",
+            "specialist_id",
+            name="uq_delegated_tasks_run_specialist",
+        ),
+        Index("ix_delegated_tasks_tenant_run", "tenant_id", "run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("collaboration_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    specialist_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    acceptance_criteria: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    allowed_evidence_kinds: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    required_scopes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    deadline_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
 class AgentRunRecord(Base):
     __tablename__ = "agent_runs"
     __table_args__ = (

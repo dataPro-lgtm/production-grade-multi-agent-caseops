@@ -11,12 +11,15 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from caseops.agent.service import AgentRunService
+from caseops.collaboration.service import CollaborationService
 from caseops.service import InvestigationService, Principal
 
 from .auth import authenticate
 from .schemas import (
     AgentRunCreate,
     AgentRunResponse,
+    CollaborationRunCreate,
+    CollaborationRunResponse,
     HealthResponse,
     InvestigationCreate,
     InvestigationResponse,
@@ -183,3 +186,53 @@ async def create_agent_run(
     if not execution.replayed:
         request.app.state.metrics.agent_steps.observe(execution.step_count)
     return AgentRunResponse.model_validate(asdict(execution))
+
+
+@router.post(
+    "/v1/cases/{case_id}/collaboration-runs",
+    response_model=CollaborationRunResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["collaboration-runs"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+        409: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+    },
+)
+async def create_collaboration_run(
+    case_id: str,
+    body: CollaborationRunCreate,
+    request: Request,
+    response: Response,
+    principal: Annotated[Principal, Depends(authenticate)],
+    session: Annotated[Session, Depends(get_session)],
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=8,
+            max_length=120,
+            pattern=r"^[A-Za-z0-9._:-]+$",
+        ),
+    ],
+) -> CollaborationRunResponse:
+    execution = await CollaborationService(
+        session=session,
+        session_factory=request.app.state.session_factory,
+        settings=request.app.state.settings,
+    ).execute(
+        principal=principal,
+        case_id=case_id,
+        goal=body.goal,
+        join_policy=body.join_policy,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
+    if execution.replayed:
+        response.status_code = status.HTTP_200_OK
+    request.app.state.metrics.collaboration_runs.labels(
+        status=execution.status,
+        replayed=str(execution.replayed).lower(),
+    ).inc()
+    return CollaborationRunResponse.model_validate(asdict(execution))

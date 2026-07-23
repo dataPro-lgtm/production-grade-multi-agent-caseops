@@ -19,15 +19,22 @@ from caseops.service import Principal
 class DelegationTokenIssuer:
     settings: Settings
 
-    def issue(self, *, principal: Principal, task_id: str) -> str:
+    def issue(
+        self,
+        *,
+        principal: Principal,
+        task_id: str,
+        resource: str | None = None,
+        scopes: frozenset[str] | None = None,
+    ) -> str:
         now = int(time.time())
         claims: dict[str, Any] = {
             "iss": self.settings.delegation_issuer,
-            "aud": self.settings.mcp_resource,
+            "aud": resource or self.settings.mcp_resource,
             "sub": principal.actor_id,
             "tenant_id": principal.tenant_id,
             "task_id": task_id,
-            "scope": " ".join(sorted(principal.scopes)),
+            "scope": " ".join(sorted(scopes or principal.scopes)),
             "iat": now,
             "nbf": now - 5,
             "exp": now + self.settings.delegation_token_ttl_seconds,
@@ -60,6 +67,20 @@ class DelegationTokenVerifier(TokenVerifier):
             subject=str(claims["sub"]),
             claims=claims,
         )
+
+
+def verify_task_token(
+    token: str,
+    *,
+    settings: Settings,
+    audience: str,
+) -> dict[str, Any]:
+    return _decode_hs256(
+        token,
+        settings.delegation_signing_key,
+        audience=audience,
+        issuer=settings.delegation_issuer,
+    )
 
 
 def _base64url_encode(payload: bytes) -> str:

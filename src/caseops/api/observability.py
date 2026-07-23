@@ -14,6 +14,7 @@ class ApiMetrics:
     investigations: Counter
     agent_runs: Counter
     agent_steps: Histogram
+    collaboration_runs: Counter
 
     @classmethod
     def create(cls) -> ApiMetrics:
@@ -48,6 +49,12 @@ class ApiMetrics:
                 "caseops_agent_run_steps",
                 "Tool proposal steps per controlled Agent run",
                 buckets=(1, 2, 3, 4, 5, 8, 13, 21),
+                registry=registry,
+            ),
+            collaboration_runs=Counter(
+                "caseops_collaboration_runs_total",
+                "Multi-Agent collaboration runs by terminal status and replay state",
+                ("status", "replayed"),
                 registry=registry,
             ),
         )

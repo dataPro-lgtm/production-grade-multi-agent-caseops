@@ -82,7 +82,7 @@ class McpProtocolTest(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertIsNotNone(initialized.protocolVersion)
-        self.assertEqual(len(tools.tools), 4)
+        self.assertEqual(len(tools.tools), 5)
         self.assertFalse(case.isError)
         self.assertEqual(case.structuredContent["task_id"], "run-mcp-001")
         self.assertNotIn("tenant_id", case.structuredContent)

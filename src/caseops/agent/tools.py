@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from caseops.infrastructure.models import (
+    CaseRiskSignalRecord,
     DocumentAliasRecord,
     SourceDocumentRecord,
 )
@@ -25,6 +26,7 @@ GET_CASE = "caseops_get_case_snapshot"
 GET_POLICY = "caseops_get_policy_requirements"
 LIST_DOCUMENTS = "caseops_list_unclassified_documents"
 RESOLVE_ALIAS = "caseops_resolve_document_alias"
+LIST_RISK_SIGNALS = "caseops_list_risk_signals"
 
 
 class CaseArgument(BaseModel):
@@ -42,6 +44,7 @@ TOOL_ARGUMENT_MODELS: dict[str, type[BaseModel]] = {
     GET_POLICY: CaseArgument,
     LIST_DOCUMENTS: CaseArgument,
     RESOLVE_ALIAS: ResolveAliasArgument,
+    LIST_RISK_SIGNALS: CaseArgument,
 }
 
 TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
@@ -90,6 +93,18 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         ),
         input_schema=ResolveAliasArgument.model_json_schema(),
         required_scope="document:resolve",
+        risk=ToolRisk.READ_ONLY,
+        timeout_seconds=5,
+    ),
+    ToolDefinition(
+        name=LIST_RISK_SIGNALS,
+        version="1.0",
+        description=(
+            "List governed, structured risk signals for a case. This is read-only "
+            "and does not authorize an operational decision."
+        ),
+        input_schema=CaseArgument.model_json_schema(),
+        required_scope="risk:read",
         risk=ToolRisk.READ_ONLY,
         timeout_seconds=5,
     ),
@@ -274,5 +289,31 @@ def execute_database_tool(
             "rule_version": alias.rule_version,
             "confidence": alias.confidence,
             "evidence_ref": document.source_ref,
+        }
+    if tool_name == LIST_RISK_SIGNALS:
+        SqlAlchemyCaseRepository(session).get(tenant_id, case_id)
+        risk_rows = session.scalars(
+            select(CaseRiskSignalRecord)
+            .where(
+                CaseRiskSignalRecord.tenant_id == tenant_id,
+                CaseRiskSignalRecord.case_id == case_id,
+            )
+            .order_by(CaseRiskSignalRecord.signal_code)
+        ).all()
+        signals = [
+            {
+                "signal_code": row.signal_code,
+                "signal_value": row.signal_value,
+                "severity": row.severity,
+                "rule_version": row.rule_version,
+                "source_ref": row.source_ref,
+                "captured_at": row.captured_at.isoformat(),
+            }
+            for row in risk_rows
+        ]
+        return {
+            "case_id": case_id,
+            "signals": signals,
+            "evidence_sha256": _hash({"case_id": case_id, "signals": signals}),
         }
     raise ToolExecutionError("TOOL_UNKNOWN", f"unknown tool: {tool_name}")

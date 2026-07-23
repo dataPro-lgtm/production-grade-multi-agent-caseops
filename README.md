@@ -4,22 +4,24 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 1
+## 当前里程碑：Slice 2
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
-第 2 章的 Slice 1 加入受控调查 Agent：
+第 2 章的 Slice 1 加入受控调查 Agent，通过状态机和 MCP 找到未结构化的事故证明，并得到 `DOCUMENTS_COMPLETE_AFTER_NORMALIZATION`。
 
-1. planner 提议读取案件、规则或来源材料；
-2. 运行时校验参数、allowlist、scope、风险和案件边界；
-3. API 签发绑定租户、任务和短期时效的任务令牌；
-4. MCP Client 通过 Streamable HTTP 调用独立工具服务；
-5. 工具服务从令牌取得租户，不接受模型传入的 `tenant_id`；
-6. 每次状态迁移和工具调用写入检查点与执行账本；
-7. 未结构化的“道路交通事故认定书”通过 `2026.1` 版别名规则归一为 `ACCIDENT_CERTIFICATE`；
-8. 最终结论为 `DOCUMENTS_COMPLETE_AFTER_NORMALIZATION`。
+第 3 章的 Slice 2 在这条控制面上增加真实多 Agent 协作：
 
-模型只提出下一步，不拥有执行权。默认验收使用确定性的 `ConformancePlanner` 检查控制面；它不是模型，也不会被包装成“Agent 效果”。真实模型适配器使用 OpenAI Responses API，并经过同一套控制和 MCP 链路。
+1. Supervisor 为 coverage、document、risk 三个专业 Agent 创建不可变委托合同；
+2. 合同显式约束目标、验收条件、证据类型、最小 scope 和 deadline；
+3. API 使用官方 A2A Python SDK，通过 A2A 1.0 HTTP+JSON 并行派发；
+4. A2A Task 与 CaseOps 业务任务分别持久化，不混淆协议状态和业务责任；
+5. 专业 Agent 使用短期任务令牌调用 MCP，只读取自己获准的事实；
+6. `EvidenceJoin` 确定性校验 Schema、任务绑定、证据范围、quorum 和冲突；
+7. 运行状态与 CloudEvents 1.0 信封写入事务 Outbox；
+8. C-102 的最终结果为 `COMPLETE_WITH_REVIEW_REQUIRED`，但 `side_effect=none`。
+
+模型不拥有执行权，专业 Agent 也不拥有全局收敛权。当前默认验收完全确定性，不用模型随机性伪装控制面正确性。
 
 ## 一键运行
 
@@ -31,7 +33,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance
+make acceptance-chapter-03
 ```
 
 运行接口：
@@ -44,17 +46,20 @@ make acceptance
 | `http://localhost:8080/metrics` | Prometheus 指标 |
 | `http://localhost:8081/health/live` | MCP 服务存活检查 |
 | `http://localhost:8081/mcp` | 受 Bearer 保护的 MCP endpoint |
+| `http://localhost:8082/health/live` | A2A 服务存活检查 |
+| `http://localhost:8082/.well-known/agent-card.json` | A2A Agent Card |
+| `http://localhost:8082/a2a/rest` | A2A 1.0 HTTP+JSON endpoint |
 
-手工发起 Agent run：
+手工发起多 Agent 协作运行：
 
 ```bash
 curl --fail-with-body \
   --request POST \
-  http://localhost:8080/v1/cases/C-102/agent-runs \
+  http://localhost:8080/v1/cases/C-102/collaboration-runs \
   --header 'Content-Type: application/json' \
   --header 'X-API-Key: caseops-local-dev-key' \
-  --header 'Idempotency-Key: book-ch02-c102-0001' \
-  --data '{"goal":"判断案件材料是否满足其绑定规则，并给出可追溯结论。"}'
+  --header 'Idempotency-Key: book-ch03-c102-0001' \
+  --data '{"goal":"并行核对案件规则、材料完整性与风险信号，通过证据合同形成可追溯的协作结论。"}'
 ```
 
 关键结果：
@@ -62,18 +67,22 @@ curl --fail-with-body \
 ```json
 {
   "status": "completed",
-  "step_count": 4,
   "result": {
-    "outcome": "DOCUMENTS_COMPLETE_AFTER_NORMALIZATION",
-    "resolved_document_codes": ["ACCIDENT_CERTIFICATE"],
-    "missing_document_codes": []
+    "outcome": "COMPLETE_WITH_REVIEW_REQUIRED",
+    "join": {
+      "accepted_specialists": ["coverage", "document", "risk"],
+      "conflicts": [],
+      "quorum_met": true
+    },
+    "recommended_action": "route_to_human_reviewer",
+    "side_effect": "none"
   }
 }
 ```
 
-使用相同幂等键再次请求会返回相同 `run_id`，且 `replayed=true`，不会重新执行工具。
+使用相同幂等键再次请求会返回相同 `run_id` 和三个 `task_id`，且 `replayed=true`，不会重新派发专业 Agent。
 
-完整命令、工具账本查询、MCP 未授权验证和真实模型配置见 [第 2 章运行手册](docs/chapter-02-runbook.md)。
+完整命令、A2A Task、业务任务、事件查询和故障语义见 [第 3 章运行手册](docs/chapter-03-runbook.md)。
 
 ## 控制面
 
@@ -81,18 +90,20 @@ curl --fail-with-body \
 API Principal
   │ tenant · actor · scopes
   ▼
-Agent Runtime
-  │ proposal → validate → authorize → execute → observe
-  │ step/repeat/timeout/retry budgets
-  │ checkpoints + tool ledger
+Supervisor
+  │ typed delegation contracts + idempotency
+  │ parallel dispatch + durable task ledger
   ▼
-MCP Client ── short-lived task token ── MCP Tool Server
-                                              │
-                                              ▼
-                                          PostgreSQL
+A2A 1.0 Server
+  │ coverage · document · risk artifacts
+  ▼
+MCP Tool Server ── five governed read tools ── PostgreSQL
+  │
+  ▼
+Evidence Join ── quorum · evidence · conflicts ── Audit + CloudEvents Outbox
 ```
 
-四个 MCP 工具全部只读：
+五个 MCP 工具全部只读：
 
 | 工具 | 作用 |
 |---|---|
@@ -100,6 +111,7 @@ MCP Client ── short-lived task token ── MCP Tool Server
 | `caseops_get_policy_requirements` | 读取案件绑定的规则版本 |
 | `caseops_list_unclassified_documents` | 列出未归一的来源材料 |
 | `caseops_resolve_document_alias` | 使用版本化别名规则做只读归一 |
+| `caseops_list_risk_signals` | 读取受治理的结构化风险信号 |
 
 动作指纹以“工具名 + 规范化参数”计算，不依赖 `tool_call_id`；模型即使更换调用 ID，也不能绕过重复调用熔断。
 
@@ -156,7 +168,9 @@ make security
 - [架构说明](docs/architecture.md)
 - [ADR-0001：先建立确定性模块化单体](docs/adr/0001-start-with-a-deterministic-modular-monolith.md)
 - [ADR-0002：先建设 Agent 控制面，再提高模型自治](docs/adr/0002-control-plane-before-model-autonomy.md)
+- [ADR-0003：由 Supervisor 持有收敛权](docs/adr/0003-supervisor-owns-convergence.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
+- [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
 
 ## “生产级”的准确含义
 
@@ -166,6 +180,7 @@ make security
 - 指定地区和行业的合规认证；
 - 经过实测的容量规划、SLO、多副本拓扑与灾备指标；
 - 写工具的业务幂等、效果账本和审批闭环；
+- 长任务异步 API、跨进程 Supervisor 恢复与 Broker 消费端；
 - 未实际执行的真实模型在线评测。
 
 这些能力会在后续章节通过代码和运行证据继续加入。在证据出现之前，README 会把它们写成限制，不写成能力。
@@ -176,7 +191,7 @@ make security
 |---|---|---|
 | 第 1 章 | 确定性内核、API、事务、审计、Outbox | 基线测试与端到端请求 |
 | 第 2 章 | 工具状态机、MCP、超时、熔断与恢复 | 协议、授权、故障与恢复测试 |
-| 第 3 章 | Supervisor、委托与 Join Contract | 部分成功与冲突测试 |
+| 第 3 章 | Supervisor、A2A、委托、Join 与 CloudEvents | 全链路、部分成功与冲突测试 |
 | 第 4 章 | Context Pipeline、RAG 2.0、GraphRAG | 来源、新鲜度与检索评测 |
 | 第 5 章 | 部署、遥测、恢复与平台化 | SLO、故障演练和恢复报告 |
 | 第 6 章 | ToolGuard、OIDC/ABAC、隐私与审计 | 红队与安全回归 |

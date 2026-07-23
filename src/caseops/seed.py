@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from .infrastructure.models import (
     CaseRecord,
+    CaseRiskSignalRecord,
     DocumentAliasRecord,
     PolicyRecord,
     SourceDocumentRecord,
@@ -98,3 +99,40 @@ def seed_reference_data(session: Session) -> None:
                 active=True,
             )
         )
+
+    risk_signals = (
+        (
+            "CLAIM_AMOUNT",
+            {"amount": 128000, "currency": "CNY"},
+            "medium",
+            "risk-signal://C-102/claim-amount@1",
+        ),
+        (
+            "POLICY_TENURE_DAYS",
+            {"days": 12},
+            "medium",
+            "risk-signal://C-102/policy-tenure@1",
+        ),
+    )
+    for signal_code, signal_value, severity, source_ref in risk_signals:
+        existing = session.scalar(
+            select(CaseRiskSignalRecord).where(
+                CaseRiskSignalRecord.tenant_id == tenant_id,
+                CaseRiskSignalRecord.case_id == "C-102",
+                CaseRiskSignalRecord.signal_code == signal_code,
+                CaseRiskSignalRecord.rule_version == "2026.1",
+            )
+        )
+        if existing is None:
+            session.add(
+                CaseRiskSignalRecord(
+                    tenant_id=tenant_id,
+                    case_id="C-102",
+                    signal_code=signal_code,
+                    signal_value=signal_value,
+                    severity=severity,
+                    rule_version="2026.1",
+                    source_ref=source_ref,
+                    captured_at=datetime.fromisoformat("2026-07-18T09:26:00+08:00"),
+                )
+            )

@@ -33,6 +33,7 @@ class Principal:
             "policy:read",
             "document:read",
             "document:resolve",
+            "risk:read",
         }
     )
 

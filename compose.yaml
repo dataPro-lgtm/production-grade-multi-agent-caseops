@@ -92,10 +92,13 @@ services:
       CASEOPS_AGENT_TOOL_TRANSPORT: mcp
       CASEOPS_MCP_URL: http://mcp:8081/mcp
       CASEOPS_MCP_RESOURCE: http://mcp:8081/mcp
+      CASEOPS_COLLABORATION_TRANSPORT: a2a
+      CASEOPS_A2A_URL: http://a2a:8082
+      CASEOPS_A2A_RESOURCE: http://a2a:8082/a2a/rest
       CASEOPS_DELEGATION_ISSUER: https://caseops.local
       CASEOPS_DELEGATION_SIGNING_KEY: caseops-local-delegation-key-change-me-32-bytes
     depends_on:
-      mcp:
+      a2a:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -106,6 +109,53 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    restart: unless-stopped
+    networks:
+      - caseops
+
+  a2a:
+    build:
+      context: .
+      target: runtime
+    environment:
+      CASEOPS_ENVIRONMENT: development
+      CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_RUN_MIGRATIONS: "false"
+      CASEOPS_AGENT_TOOL_TRANSPORT: mcp
+      CASEOPS_MCP_URL: http://mcp:8081/mcp
+      CASEOPS_MCP_RESOURCE: http://mcp:8081/mcp
+      CASEOPS_A2A_HOST: 0.0.0.0
+      CASEOPS_A2A_PORT: "8082"
+      CASEOPS_A2A_URL: http://a2a:8082
+      CASEOPS_A2A_RESOURCE: http://a2a:8082/a2a/rest
+      CASEOPS_DELEGATION_ISSUER: https://caseops.local
+      CASEOPS_DELEGATION_SIGNING_KEY: caseops-local-delegation-key-change-me-32-bytes
+    command: ["python", "-m", "caseops.collaboration.a2a_server"]
+    depends_on:
+      mcp:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/health/live', timeout=2)",
+        ]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
     restart: unless-stopped
     networks:
       - caseops

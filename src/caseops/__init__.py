@@ -3,4 +3,11 @@
 from .application import InvestigateCase
 from .domain import InvestigationRequest, InvestigationResult
 
-__all__ = ["InvestigateCase", "InvestigationRequest", "InvestigationResult"]
+__version__ = "0.3.0"
+
+__all__ = [
+    "InvestigateCase",
+    "InvestigationRequest",
+    "InvestigationResult",
+    "__version__",
+]
