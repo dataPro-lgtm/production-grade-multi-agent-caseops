@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from collections.abc import Iterator
+from typing import Annotated, cast
+
+from fastapi import APIRouter, Depends, Header, Request, Response, status
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from caseops.service import InvestigationService, Principal
+
+from .auth import authenticate
+from .schemas import (
+    HealthResponse,
+    InvestigationCreate,
+    InvestigationResponse,
+    ProblemDetails,
+)
+
+router = APIRouter()
+
+
+def get_session(request: Request) -> Iterator[Session]:
+    session = request.app.state.session_factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@router.get(
+    "/health/live",
+    response_model=HealthResponse,
+    tags=["health"],
+)
+def liveness(request: Request) -> HealthResponse:
+    settings = request.app.state.settings
+    return HealthResponse(
+        status="ok",
+        service=settings.service_name,
+        version=settings.service_version,
+    )
+
+
+@router.get(
+    "/health/ready",
+    response_model=HealthResponse,
+    tags=["health"],
+    responses={503: {"model": ProblemDetails}},
+)
+def readiness(request: Request, response: Response) -> HealthResponse:
+    settings = request.app.state.settings
+    try:
+        with request.app.state.engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        raise
+    return HealthResponse(
+        status="ok",
+        service=settings.service_name,
+        version=settings.service_version,
+    )
+
+
+@router.get("/metrics", include_in_schema=False)
+def metrics(request: Request) -> Response:
+    if not request.app.state.settings.expose_metrics:
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    return Response(
+        content=generate_latest(request.app.state.metrics.registry),
+        media_type=CONTENT_TYPE_LATEST,
+    )
+
+
+@router.post(
+    "/v1/cases/{case_id}/investigations",
+    response_model=InvestigationResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["investigations"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+        409: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+    },
+)
+def create_investigation(
+    case_id: str,
+    body: InvestigationCreate,
+    request: Request,
+    response: Response,
+    principal: Annotated[Principal, Depends(authenticate)],
+    session: Annotated[Session, Depends(get_session)],
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=8,
+            max_length=120,
+            pattern=r"^[A-Za-z0-9._:-]+$",
+        ),
+    ],
+) -> InvestigationResponse:
+    execution = InvestigationService(session).investigate(
+        principal=principal,
+        case_id=case_id,
+        notification_action=body.notification_action,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
+    if execution.replayed:
+        response.status_code = status.HTTP_200_OK
+    decision = cast(dict[str, object], execution.result["decision"])
+    request.app.state.metrics.investigations.labels(
+        decision_code=decision["code"],
+        replayed=str(execution.replayed).lower(),
+    ).inc()
+    return InvestigationResponse.model_validate(
+        {
+            "investigation_id": execution.investigation_id,
+            "idempotency_key": execution.idempotency_key,
+            "created_at": execution.created_at,
+            "replayed": execution.replayed,
+            "result": execution.result,
+        }
+    )

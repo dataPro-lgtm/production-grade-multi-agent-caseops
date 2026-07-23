@@ -1,0 +1,52 @@
+name: caseops
+
+services:
+  postgres:
+    image: postgres:17.5-alpine
+    environment:
+      POSTGRES_DB: caseops
+      POSTGRES_USER: caseops
+      POSTGRES_PASSWORD: caseops-local-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caseops -d caseops"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - caseops-postgres:/var/lib/postgresql/data
+    networks:
+      - caseops
+
+  api:
+    build:
+      context: .
+      target: runtime
+    environment:
+      CASEOPS_ENVIRONMENT: development
+      CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_LOG_LEVEL: INFO
+      CASEOPS_EXPOSE_METRICS: "true"
+      CASEOPS_FORWARDED_ALLOW_IPS: 127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    networks:
+      - caseops
+
+volumes:
+  caseops-postgres:
+
+networks:
+  caseops:
+    driver: bridge

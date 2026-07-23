@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.coverage
+.coverage.*
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+*.egg-info/
+*.py[cod]
+*.sqlite
+*.sqlite3
+caseops.db
+coverage.xml
+htmlcov/

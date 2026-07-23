@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17.5-alpine
+        env:
+          POSTGRES_DB: caseops
+          POSTGRES_USER: caseops
+          POSTGRES_PASSWORD: caseops-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U caseops -d caseops"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Type check
+        run: mypy
+
+      - name: Unit, integration, and contract tests
+        run: pytest --cov=caseops --cov-report=term-missing --cov-report=xml
+
+      - name: Validate PostgreSQL migrations and seed
+        env:
+          CASEOPS_ENVIRONMENT: test
+          CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-ci@localhost:5432/caseops
+          CASEOPS_API_KEYS: '{"ci-only-key":"tenant-demo"}'
+        run: |
+          alembic upgrade head
+          caseops seed
+          alembic current
+
+      - name: Static security scan
+        run: bandit -q -r src
+
+      - name: Build runtime image
+        run: docker build --tag caseops:${{ github.sha }} .
