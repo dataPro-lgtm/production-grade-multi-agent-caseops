@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from caseops.collaboration.contracts import CollaborationResult, JoinPolicy
+from caseops.context.contracts import ContextInvestigationResult
 
 
 class InvestigationCreate(BaseModel):
@@ -157,6 +158,16 @@ class CollaborationRunResponse(BaseModel):
     tasks: tuple[DelegatedTaskResponse, ...]
     created_at: datetime
     completed_at: datetime | None
+
+
+class ContextRunResponse(BaseModel):
+    run_id: str
+    idempotency_key: str
+    status: Literal["complete", "insufficient_evidence"]
+    replayed: bool
+    result: ContextInvestigationResult
+    created_at: datetime
+    completed_at: datetime
 
 
 class ProblemDetails(BaseModel):

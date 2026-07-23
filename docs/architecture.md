@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 2
+## 当前边界：Slice 3
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 在其上增加 Supervisor、三个专业 Agent、A2A 1.0 边界、证据 Join 与 CloudEvents Outbox。任何 Agent 都没有租户身份、数据库凭据或最终处置权。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -53,6 +53,28 @@ Supervisor Service ── collaboration_runs / delegated_tasks
  CollaborationResult + Audit + CloudEvents Outbox
 ```
 
+Slice 3 的上下文链路：
+
+```text
+Question + Principal + purpose + as_of
+  ▼
+Governed Query Planner
+  ├─ structured lookup
+  ├─ PostgreSQL full-text search
+  └─ allowlisted graph path templates / max_hops=2
+  ▼
+Reciprocal Rank Fusion
+  ▼
+Context Builder
+  │ scope · purpose · temporal · hash · trust · dedup · budget
+  ▼
+Evidence Sufficiency
+  ▼
+Context Pack ── Claim-Citation Binding ── Context Trace
+  ▼
+context_runs + Audit + CloudEvents Outbox
+```
+
 ## 执行与验证路径
 
 | 路径 | 用途 | 是否调用外部模型 |
@@ -62,6 +84,7 @@ Supervisor Service ── collaboration_runs / delegated_tasks
 | `openai + mcp` | 有 API Key 时验证真实模型规划 | 是 |
 | `collaboration direct` | 单元与 API 集成测试，验证委托和 Join | 否 |
 | `collaboration a2a + mcp` | Docker 默认协作验收，验证完整协议链 | 否 |
+| `context structured + full_text + graph` | Docker 默认上下文验收，验证来源、时态、权限、证据与关系路径 | 否 |
 
 `ConformancePlanner` 是确定性的协议一致性驱动器，不伪装成 Agent。真实模型适配器使用 Responses API，但无论 planner 来自哪里，都必须经过同一套契约、授权、预算、MCP、账本和检查点。
 
@@ -129,6 +152,8 @@ Supervisor 是 `collaboration_runs`、`delegated_tasks` 与最终 Join 的唯一
 
 单 Agent 可以判断材料是否齐备，却不应该同时拥有规则解释、来源材料归一、风险判断和最终处置责任。Slice 2 将这三类证据边界拆开并行调查，再由 Supervisor 按显式 Join Contract 收敛。拆分的理由是权限、证据与失败域不同，而不是角色名称不同。
 
+Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前规则、历史规则、来源材料、别名规则、风险信号、风险规则和外部邮件都可能被检索到，但只有满足当前主体 scope、调查用途、`as_of`、完整性和信任边界的对象才能进入 Context Pack。`2025.4` 历史规则和带越权指令的外部邮件被明确拒绝并保留 Trace，最终三条 Claim 分别绑定规则、材料和风险证据。
+
 ## 已实现的生产属性
 
 | 属性 | 当前实现 |
@@ -143,6 +168,10 @@ Supervisor 是 `collaboration_runs`、`delegated_tasks` 与最终 Join 的唯一
 | 委托 | 目标、验收、证据、scope、deadline 与父子任务绑定 |
 | Join | 必要节点、quorum、部分失败与冲突升级 |
 | 事件 | CloudEvents 1.0 信封与事务 Outbox |
+| 来源治理 | owner、分类、刷新 SLA、parser version 与启停状态 |
+| 检索 | PostgreSQL 全文、结构化查询、最长两跳关系路径与 RRF |
+| 上下文门禁 | scope、purpose、as-of、hash、信任、去重与 token budget |
+| 证据 | Context Pack、Claim-Citation Binding 与逐候选 Context Trace |
 | 模型隔离 | Responses API 仅返回提议或终态；不持有数据库凭据 |
 | 质量门禁 | Ruff、Mypy strict、pytest、分支覆盖率、Bandit、pip-audit、容器验收 |
 
@@ -153,5 +182,6 @@ Supervisor 是 `collaboration_runs`、`delegated_tasks` 与最终 Join 的唯一
 - 目前由 API 请求同步等待三个专业 Agent；面向长任务的异步提交、回调与跨进程恢复将在平台化切片加入；
 - OpenAI 适配器有契约测试，但没有 API Key 时不声称完成真实模型在线验收；
 - 当前没有容量报告、多副本会话池、备份恢复证明或生产 SLO。
+- 当前未启用 vector channel；需先交付 embedding 版本、真实领域语料、ACL 过滤策略和可复现检索评测。
 
 这些限制是显式演进项，不用 Prompt 或文档承诺替代代码证据。

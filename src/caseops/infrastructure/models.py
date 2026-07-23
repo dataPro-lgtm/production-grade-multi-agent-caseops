@@ -436,3 +436,177 @@ class ToolExecutionRecord(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+
+class KnowledgeSourceRecord(Base):
+    __tablename__ = "knowledge_sources"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "source_id",
+            name="uq_knowledge_sources_tenant_source",
+        ),
+        Index("ix_knowledge_sources_tenant_active", "tenant_id", "active"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    owner_team: Mapped[str] = mapped_column(String(120), nullable=False)
+    classification: Mapped[str] = mapped_column(String(40), nullable=False)
+    refresh_sla: Mapped[str] = mapped_column(String(80), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class KnowledgeObjectRecord(Base):
+    __tablename__ = "knowledge_objects"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "object_id",
+            name="uq_knowledge_objects_tenant_object",
+        ),
+        Index("ix_knowledge_objects_tenant_subject", "tenant_id", "subject_id"),
+        Index("ix_knowledge_objects_source_version", "source_record_id", "source_version"),
+        Index("ix_knowledge_objects_validity", "tenant_id", "valid_from", "valid_to"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    object_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_record_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_sources.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    object_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    subject_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    locator: Mapped[str] = mapped_column(String(500), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    required_scopes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    allowed_purposes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    supports_claims: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    facts: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    trust_level: Mapped[str] = mapped_column(String(40), nullable=False)
+    contains_instructions: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class KnowledgeEntityRecord(Base):
+    __tablename__ = "knowledge_entities"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "entity_key",
+            name="uq_knowledge_entities_tenant_key",
+        ),
+        Index("ix_knowledge_entities_tenant_type", "tenant_id", "entity_type"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    entity_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    canonical_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class KnowledgeRelationRecord(Base):
+    __tablename__ = "knowledge_relations"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "relation_id",
+            name="uq_knowledge_relations_tenant_relation",
+        ),
+        Index("ix_knowledge_relations_from", "tenant_id", "from_entity_id"),
+        Index("ix_knowledge_relations_to", "tenant_id", "to_entity_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    relation_id: Mapped[str] = mapped_column(String(160), nullable=False)
+    from_entity_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    relation_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    to_entity_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_entities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    path_template: Mapped[str] = mapped_column(String(120), nullable=False)
+    evidence_object_record_id: Mapped[str] = mapped_column(
+        ForeignKey("knowledge_objects.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    valid_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    valid_to: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class ContextRunRecord(Base):
+    __tablename__ = "context_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_context_runs_tenant_idempotency",
+        ),
+        Index("ix_context_runs_tenant_case", "tenant_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(80), nullable=False)
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    retrieval_plan: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    context_pack: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    answer: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    trace: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )

@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 2
+## 当前里程碑：Slice 3
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -21,7 +21,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 7. 运行状态与 CloudEvents 1.0 信封写入事务 Outbox；
 8. C-102 的最终结果为 `COMPLETE_WITH_REVIEW_REQUIRED`，但 `side_effect=none`。
 
-模型不拥有执行权，专业 Agent 也不拥有全局收敛权。当前默认验收完全确定性，不用模型随机性伪装控制面正确性。
+第 4 章的 Slice 3 把“Agent 能取数”升级为“每次推理只获得受治理的证据产品”：
+
+1. Source Registry 登记 owner、分类、刷新 SLA 与 parser version；
+2. 知识对象携带 source version、valid time、observed time、ACL scope、purpose 与 content hash；
+3. Query Planner 只允许结构化、PostgreSQL 全文检索和显式 Graph Path Template；
+4. 多通道候选用 RRF 融合，不混用不可比较的原始分数；
+5. Context Builder 依次执行 scope、purpose、as-of、完整性、非可信指令、去重和 token budget 门禁；
+6. Evidence Sufficiency 按必要主张类型判断，最多执行两轮；
+7. 最终三条 Claim 均绑定 Context Pack 内的 Evidence ID；
+8. 过期规则和带提示注入的外部邮件会进入 Context Trace，但不会进入 Context Pack。
+
+模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面正确性。
 
 ## 一键运行
 
@@ -33,7 +44,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-03
+make acceptance-chapter-04
 ```
 
 运行接口：
@@ -50,39 +61,46 @@ make acceptance-chapter-03
 | `http://localhost:8082/.well-known/agent-card.json` | A2A Agent Card |
 | `http://localhost:8082/a2a/rest` | A2A 1.0 HTTP+JSON endpoint |
 
-手工发起多 Agent 协作运行：
+手工发起受治理的 Context Investigation：
 
 ```bash
 curl --fail-with-body \
   --request POST \
-  http://localhost:8080/v1/cases/C-102/collaboration-runs \
+  http://localhost:8080/v1/cases/C-102/context-investigations \
   --header 'Content-Type: application/json' \
   --header 'X-API-Key: caseops-local-dev-key' \
-  --header 'Idempotency-Key: book-ch03-c102-0001' \
-  --data '{"goal":"并行核对案件规则、材料完整性与风险信号，通过证据合同形成可追溯的协作结论。"}'
+  --header 'Idempotency-Key: book-ch04-c102-0001' \
+  --data '{
+    "question":"C-102 的事故证明是否满足规则要求，适用哪个规则版本，为什么需要人工复核？",
+    "purpose":"claim_investigation",
+    "as_of":"2026-07-23T12:00:00+08:00",
+    "evidence_token_budget":1800,
+    "max_rounds":2
+  }'
 ```
 
 关键结果：
 
 ```json
 {
-  "status": "completed",
+  "status": "complete",
   "result": {
-    "outcome": "COMPLETE_WITH_REVIEW_REQUIRED",
-    "join": {
-      "accepted_specialists": ["coverage", "document", "risk"],
-      "conflicts": [],
-      "quorum_met": true
+    "context_pack": {
+      "stop_reason": "evidence_sufficient",
+      "retrieval_rounds": 1
     },
-    "recommended_action": "route_to_human_reviewer",
-    "side_effect": "none"
+    "answer": {
+      "verdict": "complete",
+      "recommended_action": "route_to_human_reviewer",
+      "side_effect": "none"
+    }
   }
 }
 ```
 
-使用相同幂等键再次请求会返回相同 `run_id` 和三个 `task_id`，且 `replayed=true`，不会重新派发专业 Agent。
+使用相同幂等键再次请求会返回相同 `run_id` 和 `pack_id`，且 `replayed=true`，不会重新检索和构建 Context Pack。
 
-完整命令、A2A Task、业务任务、事件查询和故障语义见 [第 3 章运行手册](docs/chapter-03-runbook.md)。
+完整命令、来源清单、图关系、Context Trace 和门禁验证见 [第 4 章运行手册](docs/chapter-04-runbook.md)。
 
 ## 控制面
 
@@ -101,6 +119,23 @@ MCP Tool Server ── five governed read tools ── PostgreSQL
   │
   ▼
 Evidence Join ── quorum · evidence · conflicts ── Audit + CloudEvents Outbox
+```
+
+上下文控制面：
+
+```text
+Question + Principal + as_of + purpose
+  ▼
+Governed Query Planner
+  ├─ structured
+  ├─ PostgreSQL full-text
+  └─ allowlisted graph paths
+  ▼
+RRF → Context Gates → Evidence Sufficiency
+  ▼
+Versioned Context Pack + Claim-Citation Binding + Context Trace
+  ▼
+Audit + CloudEvents Outbox
 ```
 
 五个 MCP 工具全部只读：
@@ -161,7 +196,8 @@ make security
 - pip-audit 依赖漏洞扫描；
 - PostgreSQL 迁移与种子数据验证；
 - 非 root、只读文件系统容器构建；
-- API → MCP → PostgreSQL 端到端验收。
+- API → A2A → MCP → PostgreSQL 端到端验收；
+- Context Pipeline → PostgreSQL FTS / Graph → Context Pack 端到端验收。
 
 ## 设计文档
 
@@ -169,8 +205,10 @@ make security
 - [ADR-0001：先建立确定性模块化单体](docs/adr/0001-start-with-a-deterministic-modular-monolith.md)
 - [ADR-0002：先建设 Agent 控制面，再提高模型自治](docs/adr/0002-control-plane-before-model-autonomy.md)
 - [ADR-0003：由 Supervisor 持有收敛权](docs/adr/0003-supervisor-owns-convergence.md)
+- [ADR-0004：Context Pack 是受治理的证据产品](docs/adr/0004-context-pack-is-a-governed-evidence-product.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
 - [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
+- [第 4 章运行与验收手册](docs/chapter-04-runbook.md)
 
 ## “生产级”的准确含义
 
@@ -181,6 +219,7 @@ make security
 - 经过实测的容量规划、SLO、多副本拓扑与灾备指标；
 - 写工具的业务幂等、效果账本和审批闭环；
 - 长任务异步 API、跨进程 Supervisor 恢复与 Broker 消费端；
+- 经过领域语料评测的 embedding provider、向量索引和默认 vector channel；
 - 未实际执行的真实模型在线评测。
 
 这些能力会在后续章节通过代码和运行证据继续加入。在证据出现之前，README 会把它们写成限制，不写成能力。

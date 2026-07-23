@@ -18,6 +18,7 @@ from caseops.infrastructure.models import (
     AuditEventRecord,
     Base,
     CollaborationRunRecord,
+    ContextRunRecord,
     DelegatedTaskRecord,
     InvestigationRecord,
     OutboxEventRecord,
@@ -338,6 +339,39 @@ class ApiIntegrationTest(unittest.IsolatedAsyncioTestCase):
                 3,
             )
 
+    async def test_context_investigation_builds_auditable_pack_and_replays(
+        self,
+    ) -> None:
+        first = await self._run_context("book-ch04-c102-0001")
+        second = await self._run_context("book-ch04-c102-0001")
+
+        self.assertEqual(first.status_code, 201, first.text)
+        self.assertEqual(second.status_code, 200, second.text)
+        payload = first.json()
+        self.assertEqual(payload["status"], "complete")
+        self.assertFalse(payload["replayed"])
+        self.assertTrue(second.json()["replayed"])
+        self.assertEqual(payload["run_id"], second.json()["run_id"])
+        self.assertEqual(payload["result"]["answer"]["verdict"], "complete")
+        self.assertEqual(payload["result"]["answer"]["side_effect"], "none")
+        self.assertEqual(
+            payload["result"]["context_pack"]["stop_reason"],
+            "evidence_sufficient",
+        )
+        self.assertEqual(
+            {claim["claim_id"] for claim in payload["result"]["answer"]["claims"]},
+            {
+                "claim-policy-version",
+                "claim-document-status",
+                "claim-manual-review",
+            },
+        )
+        with self.factory() as session:
+            self.assertEqual(
+                session.scalar(select(func.count(ContextRunRecord.id))),
+                1,
+            )
+
     async def _investigate(
         self,
         idempotency_key: str,
@@ -378,6 +412,26 @@ class ApiIntegrationTest(unittest.IsolatedAsyncioTestCase):
                     "并行核对案件规则、材料完整性与风险信号，"
                     "通过证据合同形成可追溯的协作结论。"
                 )
+            },
+        )
+
+    async def _run_context(self, idempotency_key: str) -> httpx.Response:
+        return await self.client.post(
+            "/v1/cases/C-102/context-investigations",
+            headers={
+                "X-API-Key": "integration-test-key",
+                "Idempotency-Key": idempotency_key,
+                "X-Request-ID": f"request-{idempotency_key}",
+            },
+            json={
+                "question": (
+                    "C-102 的事故证明是否满足规则要求，适用哪个规则版本，"
+                    "为什么需要人工复核？"
+                ),
+                "purpose": "claim_investigation",
+                "as_of": "2026-07-23T12:00:00+08:00",
+                "evidence_token_budget": 1800,
+                "max_rounds": 2,
             },
         )
 

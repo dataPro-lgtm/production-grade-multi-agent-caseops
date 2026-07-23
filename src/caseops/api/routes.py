@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 
 from caseops.agent.service import AgentRunService
 from caseops.collaboration.service import CollaborationService
+from caseops.context.contracts import ContextInvestigationRequest
+from caseops.context.service import ContextInvestigationService
 from caseops.service import InvestigationService, Principal
 
 from .auth import authenticate
@@ -20,6 +22,7 @@ from .schemas import (
     AgentRunResponse,
     CollaborationRunCreate,
     CollaborationRunResponse,
+    ContextRunResponse,
     HealthResponse,
     InvestigationCreate,
     InvestigationResponse,
@@ -236,3 +239,48 @@ async def create_collaboration_run(
         replayed=str(execution.replayed).lower(),
     ).inc()
     return CollaborationRunResponse.model_validate(asdict(execution))
+
+
+@router.post(
+    "/v1/cases/{case_id}/context-investigations",
+    response_model=ContextRunResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["context-investigations"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+        409: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+    },
+)
+def create_context_investigation(
+    case_id: str,
+    body: ContextInvestigationRequest,
+    request: Request,
+    response: Response,
+    principal: Annotated[Principal, Depends(authenticate)],
+    session: Annotated[Session, Depends(get_session)],
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=8,
+            max_length=120,
+            pattern=r"^[A-Za-z0-9._:-]+$",
+        ),
+    ],
+) -> ContextRunResponse:
+    execution = ContextInvestigationService(session).execute(
+        principal=principal,
+        case_id=case_id,
+        request=body,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
+    if execution.replayed:
+        response.status_code = status.HTTP_200_OK
+    request.app.state.metrics.context_runs.labels(
+        verdict=execution.status,
+        replayed=str(execution.replayed).lower(),
+    ).inc()
+    return ContextRunResponse.model_validate(asdict(execution))

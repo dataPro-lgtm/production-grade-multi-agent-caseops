@@ -85,7 +85,9 @@ def create_app(
             "Production-oriented case investigation reference service. "
             "Slice 0 provides a deterministic baseline; Slice 1 adds a controlled "
             "tool state machine and governed MCP execution; Slice 2 adds typed "
-            "delegation, A2A specialists, deterministic evidence join, and events."
+            "delegation, A2A specialists, deterministic evidence join, and events; "
+            "Slice 3 adds governed hybrid retrieval, graph paths, Context Packs, "
+            "claim-citation binding, and Context Trace."
         ),
         lifespan=lifespan,
     )
