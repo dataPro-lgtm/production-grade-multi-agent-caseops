@@ -113,8 +113,9 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 - Docker Compose v2。
 
 ```bash
-docker compose up --build -d
+docker compose up --build --wait --wait-timeout 120 -d
 docker compose ps
+make acceptance-chapter-08
 make acceptance-chapter-09
 make acceptance-chapter-10
 ```
