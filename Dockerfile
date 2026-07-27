@@ -5,10 +5,11 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /build
-COPY pyproject.toml README.md requirements.lock ./
+COPY requirements.lock ./
+RUN python -m pip wheel --wheel-dir /wheels --require-hashes -r requirements.lock
+COPY pyproject.toml README.md ./
 COPY src ./src
-RUN python -m pip wheel --wheel-dir /wheels --require-hashes -r requirements.lock \
-    && python -m pip wheel --wheel-dir /wheels --no-deps .
+RUN python -m pip wheel --wheel-dir /wheels --no-deps .
 
 FROM python:3.12.7-slim-bookworm@sha256:60d9996b6a8a3689d36db740b49f4327be3be09a21122bd02fb8895abb38b50d AS runtime
 
