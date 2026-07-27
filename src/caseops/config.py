@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     service_name: str = "caseops-api"
-    service_version: str = "0.7.0"
+    service_version: str = "0.8.0"
     database_url: str = "sqlite+pysqlite:///./caseops.db"
     api_keys: dict[str, str] = Field(
         default_factory=lambda: {"caseops-local-dev-key": "tenant-demo"}

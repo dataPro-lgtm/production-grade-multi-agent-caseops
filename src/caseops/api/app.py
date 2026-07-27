@@ -103,7 +103,9 @@ def create_app(
             "Guard policy, privacy release controls, security decision audit, "
             "and red-team regression; Slice 6 adds a validated system DAG, "
             "hierarchical team convergence, deterministic cross-team acceptance, "
-            "and a queryable runtime Context Graph."
+            "and a queryable runtime Context Graph; Slice 7 adds a versioned "
+            "Golden Dataset, layered deterministic graders, N-run semantic "
+            "consistency, and paired release gates."
         ),
         lifespan=lifespan,
     )

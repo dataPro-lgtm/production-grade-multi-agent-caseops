@@ -1,0 +1,38 @@
+{
+  "schema_version": "caseops.evaluation-baseline.v1",
+  "release": "v0.7.0",
+  "dataset_version": "2026.07.1",
+  "execution_mode": "deterministic-conformance",
+  "cases": [
+    {
+      "case_id": "GD-001",
+      "repetitions": 3,
+      "layer_scores": {"contract": 1.0, "outcome": 1.0, "path": 1.0, "evidence": 1.0, "security": 1.0, "efficiency": 1.0},
+      "consistency": 1.0
+    },
+    {
+      "case_id": "GD-002",
+      "repetitions": 3,
+      "layer_scores": {"contract": 1.0, "outcome": 1.0, "path": 1.0, "evidence": 1.0, "security": 1.0, "efficiency": 1.0},
+      "consistency": 1.0
+    },
+    {
+      "case_id": "GD-003",
+      "repetitions": 3,
+      "layer_scores": {"contract": 1.0, "outcome": 1.0, "path": 1.0, "evidence": 1.0, "security": 1.0, "efficiency": 1.0},
+      "consistency": 1.0
+    },
+    {
+      "case_id": "GD-004",
+      "repetitions": 2,
+      "layer_scores": {"contract": 1.0, "outcome": 1.0, "path": 1.0, "evidence": 1.0, "security": 1.0, "efficiency": 1.0},
+      "consistency": 1.0
+    },
+    {
+      "case_id": "GD-005",
+      "repetitions": 2,
+      "layer_scores": {"contract": 1.0, "outcome": 1.0, "path": 1.0, "evidence": 1.0, "security": 1.0, "efficiency": 1.0},
+      "consistency": 1.0
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: install migrate seed run test lint typecheck security verify acceptance acceptance-chapter-03 acceptance-chapter-04 acceptance-chapter-05 acceptance-chapter-06 acceptance-chapter-07 observability-up observability-down compose-up compose-down
+.PHONY: install migrate seed run test lint typecheck security verify acceptance acceptance-chapter-03 acceptance-chapter-04 acceptance-chapter-05 acceptance-chapter-06 acceptance-chapter-07 acceptance-chapter-08 observability-up observability-down compose-up compose-down
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"
@@ -47,6 +47,9 @@ acceptance-chapter-06:
 
 acceptance-chapter-07:
 	./scripts/acceptance-chapter-07.sh
+
+acceptance-chapter-08:
+	./scripts/acceptance-chapter-08.sh
 
 observability-up:
 	docker compose -f compose.yaml -f deploy/compose.observability.yaml up --build -d

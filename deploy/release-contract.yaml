@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.7.0
+release: v0.8.0
 services:
   api:
     image: caseops-api
@@ -45,3 +45,17 @@ orchestration:
   convergence: deterministic-cross-team-acceptance
   runtime_context_graph: metadata-and-digests-no-raw-prompts
   acceptance: scripts/acceptance-chapter-07.sh
+evaluation:
+  golden_dataset: caseops-system-convergence@2026.07.1
+  baseline: v0.7.0
+  execution_mode: deterministic-conformance
+  repetitions: 13
+  hard_gates:
+    - contract
+    - outcome
+    - path
+    - evidence
+    - security
+    - efficiency
+  report: artifacts/evaluation/chapter-08-report.json
+  acceptance: scripts/acceptance-chapter-08.sh

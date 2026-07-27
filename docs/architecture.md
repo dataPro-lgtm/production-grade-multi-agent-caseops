@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 6
+## 当前边界：Slice 7
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径；Slice 6 用类型化 DAG、团队边界、系统级确定性验收与 Runtime Context Graph 合龙这些能力。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径；Slice 6 用类型化 DAG、团队边界、系统级确定性验收与 Runtime Context Graph 合龙这些能力；Slice 7 用版本化 Golden Dataset、分层 Grader、N-run 与成对基线比较控制候选发布。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -150,6 +150,30 @@ Central Supervisor ── validated DAG ── system_runs / system_steps
 
 这不是把所有状态塞进一个“大 Supervisor”。Central Supervisor 只拥有计划、依赖和系统终态；Context Team 拥有 Context Pack，Collaboration Team 拥有委托与 Join，专业节点只拥有自己的不可变 Artifact。系统级验收消费引用和结构化主张，不回写团队内部状态。
 
+Slice 7 的系统级评测门禁：
+
+```text
+Golden Dataset + Quality Contract + v0.7.0 Baseline
+                         │
+                         ▼
+              Live HTTP Replay / N-run
+                         │
+                         ▼
+ contract · outcome · path · evidence · security · efficiency
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+ Runtime Context Graph          Tenant-isolation probe
+ Claim → SUPPORTED_BY                 expected 404
+             └───────────┬───────────┘
+                         ▼
+           Paired Case/Layer Comparison
+                         ▼
+                PASS or BLOCK + JSON report
+```
+
+这条评测链不另造旁路 Fixture API。它调用与发布候选相同的系统接口、A2A、MCP、数据库和权限控制。当前 N-run 验证确定性 conformance 控制面的语义稳定性，不替代未来真实随机模型的统计评测。
+
 ## 执行与验证路径
 
 | 路径 | 用途 | 是否调用外部模型 |
@@ -162,6 +186,7 @@ Central Supervisor ── validated DAG ── system_runs / system_steps
 | `context structured + full_text + graph` | Docker 默认上下文验收，验证来源、时态、权限、证据与关系路径 | 否 |
 | `security red-team + live collaboration` | Docker 默认安全验收，验证权限交集、数据释放和注入隔离 | 否 |
 | `system DAG + context + A2A/MCP + acceptance` | Docker 默认系统验收，验证分层合龙与 Runtime Context Graph | 否 |
+| `Golden Dataset + live HTTP N-run + paired gates` | Docker 默认发布评测，验证六层非回归与租户隔离 | 否 |
 
 `ConformancePlanner` 是确定性的协议一致性驱动器，不伪装成 Agent。真实模型适配器使用 Responses API，但无论 planner 来自哪里，都必须经过同一套契约、授权、预算、MCP、账本和检查点。
 
@@ -268,6 +293,9 @@ Runtime Context Graph 是本次运行的来源索引，不是企业知识图谱�
 | 分层合龙 | 类型化无环 DAG、Central/Team/Worker 状态所有权与父子运行引用 |
 | 系统验收 | 规则、材料、风险、证据与副作用 7 项确定性检查 |
 | Runtime Context Graph | Goal 到 Result 的来源索引；Claim 必须存在 `SUPPORTED_BY` 边 |
+| Golden Dataset | 5 类版本化场景、13 次运行、风险与预期合同 |
+| 分层评测 | 契约、结果、路径、证据、安全和效率六层硬门禁 |
+| 持续回归 | v0.7.0 成对基线、语义指纹、机器可读报告与 CI Artifact |
 
 ## 尚未声称完成
 
@@ -280,5 +308,6 @@ Runtime Context Graph 是本次运行的来源索引，不是企业知识图谱�
 - OutputGuard 已交付确定性组件和安全回归，但当前没有邮件、Webhook 或文件导出连接器；新增任何外发边界时必须接入释放策略与效果审计。
 - 当前系统步骤在一个 API 工作进程内按可运行集合顺序调度；跨进程队列、租约、心跳和抢占恢复尚未实现。
 - MCP Tasks 在 2025-11-25 规范中仍是实验能力；当前五个工具是有界、同步、只读调用，因此没有为了“看起来异步”而启用。长时工具出现后再按能力协商引入。
+- Slice 7 的 13 次运行是当前确定性执行模式的回归合同，不声称代表真实模型的总体成功率；接入随机模型后必须另做样本量、方差、Judge 校准与目标环境 SLO 设计。
 
 这些限制是显式演进项，不用 Prompt 或文档承诺替代代码证据。

@@ -14,3 +14,4 @@ __pycache__/
 caseops.db
 coverage.xml
 htmlcov/
+artifacts/evaluation/*.json

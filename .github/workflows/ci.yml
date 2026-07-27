@@ -52,6 +52,25 @@ jobs:
       - name: Deterministic agent-security red team
         run: python -m caseops.security.red_team --json
 
+      - name: Validate versioned evaluation assets and deterministic graders
+        run: |
+          python - <<'PY'
+          from caseops.evaluation import (
+              load_baseline,
+              load_dataset,
+              load_quality_contract,
+          )
+
+          dataset = load_dataset()
+          baseline = load_baseline()
+          contract = load_quality_contract()
+          assert dataset.version == baseline.dataset_version
+          assert len(dataset.cases) == 5
+          assert sum(case.repetitions for case in dataset.cases) == 13
+          assert contract.release_blocking_layers
+          print("evaluation assets accepted")
+          PY
+
       - name: Validate PostgreSQL migrations and seed
         env:
           CASEOPS_ENVIRONMENT: test
@@ -69,6 +88,24 @@ jobs:
 
       - name: Build runtime image
         run: docker build --tag caseops:${{ github.sha }} .
+
+      - name: Run live multi-agent evaluation gate
+        run: |
+          docker compose up --build --wait --wait-timeout 120 -d
+          PATH="$PWD/.venv/bin:$PATH" make acceptance-chapter-08
+
+      - name: Upload evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: caseops-evaluation-${{ github.sha }}
+          path: artifacts/evaluation/chapter-08-report.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop evaluation platform
+        if: always()
+        run: docker compose down
 
       - name: Validate Compose platform contract
         run: |

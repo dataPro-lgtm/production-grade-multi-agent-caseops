@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 6
+## 当前里程碑：Slice 7
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -66,6 +66,19 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 8. 同一幂等键可安全重放，失败运行可复用已完成的子运行继续收敛；
 9. C-102 通过全部 7 项系统检查，因风险规则进入人工复核，且 `side_effect=none`。
 
+第 8 章的 Slice 7 把“测试通过”升级为“候选发布有系统级质量证据”：
+
+1. Golden Dataset、Quality Contract 与 v0.7.0 基线全部版本化；
+2. 5 类场景执行 13 次真实 HTTP 运行，覆盖标准合龙、最小预算、提示注入、幂等重放与冲突；
+3. grader 分层检查契约、结果、路径、证据、安全和效率预算，不用一个平均分掩盖高风险失败；
+4. 每个成功运行都检查 3 步 DAG、7 项系统验收、6 条 Claim、7 个 Evidence 引用；
+5. Runtime Context Graph 至少包含 20 个节点和 40 条边，且所有 Claim 必须存在 `SUPPORTED_BY`；
+6. 每次成功运行都用另一租户反向访问 Context Graph，必须返回 404；
+7. N-run 使用排除运行 ID 与时间戳的语义指纹检查漂移；
+8. 候选与冻结基线按 case、按 layer 成对比较，任一硬层下降即阻断发布；
+9. CI 留存完整 JSON 报告，wall-clock 仅诊断，目标环境 SLO 由生产遥测判定；
+10. 模型 Judge 保持辅助地位，未经人工校准不能覆盖确定性安全门禁。
+
 模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面、运行保证或安全策略的正确性。
 
 ## 一键运行
@@ -78,7 +91,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-07
+make acceptance-chapter-08
 ```
 
 如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
@@ -148,6 +161,7 @@ curl --fail-with-body \
 完整的 Trace、SLO、故障降级与恢复验证见 [第 5 章运行手册](docs/chapter-05-runbook.md)。
 安全控制、红队样例与审计查询见 [第 6 章运行手册](docs/chapter-06-runbook.md)。
 分层合龙、系统验收与 Runtime Context Graph 见 [第 7 章运行手册](docs/chapter-07-runbook.md)。
+Golden Dataset、分层评测与持续回归见 [第 8 章运行手册](docs/chapter-08-runbook.md)。
 
 手工发起系统级合龙运行：
 

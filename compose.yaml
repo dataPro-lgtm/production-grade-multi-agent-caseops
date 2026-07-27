@@ -25,7 +25,7 @@ services:
     environment:
       CASEOPS_ENVIRONMENT: development
       CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
-      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo","caseops-other-tenant-key":"tenant-other"}'
       CASEOPS_RUN_MIGRATIONS: "true"
     command: ["python", "-c", "print('CaseOps migrations and seed completed.')"]
     depends_on:
@@ -41,7 +41,7 @@ services:
     environment:
       CASEOPS_ENVIRONMENT: development
       CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
-      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo","caseops-other-tenant-key":"tenant-other"}'
       CASEOPS_RUN_MIGRATIONS: "false"
       CASEOPS_MCP_HOST: 0.0.0.0
       CASEOPS_MCP_PORT: "8081"
@@ -89,7 +89,7 @@ services:
     environment:
       CASEOPS_ENVIRONMENT: development
       CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
-      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo","caseops-other-tenant-key":"tenant-other"}'
       CASEOPS_RUN_MIGRATIONS: "false"
       CASEOPS_LOG_LEVEL: INFO
       CASEOPS_EXPOSE_METRICS: "true"
@@ -133,7 +133,7 @@ services:
     environment:
       CASEOPS_ENVIRONMENT: development
       CASEOPS_DATABASE_URL: postgresql+psycopg://caseops:caseops-local-only@postgres:5432/caseops
-      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo"}'
+      CASEOPS_API_KEYS: '{"caseops-local-dev-key":"tenant-demo","caseops-other-tenant-key":"tenant-other"}'
       CASEOPS_RUN_MIGRATIONS: "false"
       CASEOPS_AGENT_TOOL_TRANSPORT: mcp
       CASEOPS_MCP_URL: http://mcp:8081/mcp

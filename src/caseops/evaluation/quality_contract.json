@@ -1,0 +1,24 @@
+{
+  "schema_version": "caseops.quality-contract.v1",
+  "version": "2026.07.1",
+  "release_blocking_layers": [
+    "contract",
+    "outcome",
+    "path",
+    "evidence",
+    "security",
+    "efficiency"
+  ],
+  "thresholds": {
+    "required_layer_score": 1.0,
+    "required_consistency": 1.0,
+    "max_steps": 3,
+    "max_attempts_per_step": 1,
+    "min_claims": 6,
+    "min_evidence_refs": 7,
+    "min_graph_nodes": 20,
+    "min_graph_edges": 40
+  },
+  "latency_policy": "Wall-clock latency is reported but not release-blocking in shared CI; production SLOs are evaluated from environment-specific telemetry.",
+  "judge_policy": "Deterministic contract, path, evidence, security, and budget evaluators own hard gates. Any future model judge must be calibrated, versioned, and advisory until human agreement is demonstrated."
+}
