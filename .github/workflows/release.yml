@@ -100,6 +100,7 @@ jobs:
           images: ${{ env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ steps.version.outputs.number }}
+            type=raw,value=${{ steps.version.outputs.tag }}
             type=raw,value=latest
 
       - name: Build and push immutable release image
@@ -177,10 +178,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            "caseops-${{ steps.version.outputs.tag }}-release.tar.gz" \
-            "artifacts/release/caseops-${{ steps.version.outputs.tag }}.spdx.json" \
-            artifacts/release/SHA256SUMS \
-            --verify-tag \
-            --generate-notes \
-            --title "CaseOps ${{ steps.version.outputs.tag }}"
+          release_tag="${{ steps.version.outputs.tag }}"
+          release_assets=(
+            "caseops-${release_tag}-release.tar.gz"
+            "artifacts/release/caseops-${release_tag}.spdx.json"
+            "artifacts/release/SHA256SUMS"
+          )
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" "${release_assets[@]}" --clobber
+            gh release edit "$release_tag" --title "CaseOps ${release_tag}"
+          else
+            gh release create "$release_tag" "${release_assets[@]}" \
+              --verify-tag \
+              --generate-notes \
+              --title "CaseOps ${release_tag}"
+          fi
