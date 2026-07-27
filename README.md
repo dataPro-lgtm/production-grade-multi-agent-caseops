@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 8
+## 当前里程碑：v1.0 / Slice 9
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -91,6 +91,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 8. A2A 恢复后重新执行系统运行，必须再次形成健康评估；
 9. 基线、事故与恢复三份评估合并为版本化 JSON 证据，并由 CI 留存。
 
+第 10 章的 Slice 9 把“仓库内容完整”升级为“第三方可以验证交付物从哪里来、装了什么、是否被替换”：
+
+1. Python 基础镜像固定到不可变 digest，运行时与开发依赖由带 SHA-256 哈希的锁文件收敛；
+2. 终审只接受已提交的 Git tree，并用 `git archive HEAD` 排除 `.env`、数据库、缓存和本机历史证据；
+3. 干净源码重新构建镜像，验证 UID 10001、包版本、OCI 版本标签和源码提交；
+4. Syft 对实际运行镜像生成 SPDX 2.3 JSON SBOM，不用手写依赖清单冒充机器证据；
+5. `release-evidence.json` 绑定 Git SHA、镜像 digest、迁移头、OpenAPI、系统评测、GameDay 和 SBOM；
+6. `SHA256SUMS` 覆盖下载包内全部证据，消费者可以独立复核完整性；
+7. 精确 `v1.0.0` 标签触发完整发布门禁，失败时不会创建 GitHub Release；
+8. GHCR 镜像同时获得构建来源证明和 SBOM 证明，下载包获得独立来源证明；
+9. 发布说明明确区分“来源可验证”和“软件安全”，不把 attestation 当成漏洞或合规结论。
+
 模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面、运行保证或安全策略的正确性。
 
 ## 一键运行
@@ -104,6 +116,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 docker compose up --build -d
 docker compose ps
 make acceptance-chapter-09
+make acceptance-chapter-10
 ```
 
 如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
@@ -175,6 +188,7 @@ curl --fail-with-body \
 分层合龙、系统验收与 Runtime Context Graph 见 [第 7 章运行手册](docs/chapter-07-runbook.md)。
 Golden Dataset、分层评测与持续回归见 [第 8 章运行手册](docs/chapter-08-runbook.md)。
 事故证据包、成本归因与 A2A 恢复演练见 [第 9 章运行手册](docs/chapter-09-runbook.md)。
+系统终审、SBOM、来源证明与 v1.0 发布见 [第 10 章运行手册](docs/chapter-10-runbook.md)。
 
 手工发起系统级合龙运行：
 

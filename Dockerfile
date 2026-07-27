@@ -1,15 +1,26 @@
 # syntax=docker/dockerfile:1.7
-FROM python:3.12.7-slim-bookworm AS builder
+FROM python:3.12.7-slim-bookworm@sha256:60d9996b6a8a3689d36db740b49f4327be3be09a21122bd02fb8895abb38b50d AS builder
 
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /build
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md requirements.lock ./
 COPY src ./src
-RUN python -m pip wheel --wheel-dir /wheels .
+RUN python -m pip wheel --wheel-dir /wheels --require-hashes -r requirements.lock \
+    && python -m pip wheel --wheel-dir /wheels --no-deps .
 
-FROM python:3.12.7-slim-bookworm AS runtime
+FROM python:3.12.7-slim-bookworm@sha256:60d9996b6a8a3689d36db740b49f4327be3be09a21122bd02fb8895abb38b50d AS runtime
+
+ARG VERSION=dev
+ARG VCS_REF=unknown
+
+LABEL org.opencontainers.image.title="CaseOps" \
+      org.opencontainers.image.description="Production-grade multi-agent reference system" \
+      org.opencontainers.image.source="https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.licenses="MIT"
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

@@ -108,7 +108,10 @@ def create_app(
             "Golden Dataset, layered deterministic graders, N-run semantic "
             "consistency, and paired release gates; Slice 8 adds durable "
             "operational assessments, causal incident bundles, honest "
-            "resource-count attribution, and a verified A2A recovery GameDay."
+            "resource-count attribution, and a verified A2A recovery GameDay; "
+            "Slice 9 closes the delivery chain with clean-room reproduction, "
+            "a release evidence manifest, SBOM, checksums, and verifiable "
+            "build provenance."
         ),
         lifespan=lifespan,
     )

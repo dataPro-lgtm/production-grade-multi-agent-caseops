@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use CaseOps in teaching or research, please cite this repository."
+title: "CaseOps: Production-Grade Multi-Agent Reference System"
+type: software
+authors:
+  - family-names: "Zeng"
+    given-names: "Dan"
+repository-code: "https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops"
+url: "https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops"
+license: MIT
+version: 1.0.0
+date-released: 2026-07-27

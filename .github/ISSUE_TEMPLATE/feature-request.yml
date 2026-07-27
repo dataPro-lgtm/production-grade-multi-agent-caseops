@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a bounded capability or architecture change
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and boundary
+      description: What production problem is not covered, and what is out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Proposed decision
+      description: Include contracts, ownership, failure semantics, and alternatives.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: How should success, failure, tenant isolation, and side effects be verified?
+    validations:
+      required: true

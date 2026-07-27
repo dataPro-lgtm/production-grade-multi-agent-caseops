@@ -12,7 +12,8 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install --require-hashes -r requirements-dev.lock
+python -m pip install --no-deps -e .
 make verify
 make security
 docker compose up --build -d
@@ -26,3 +27,5 @@ Pull requests must not contain credentials or real personal data. Use the synthe
 - Identify schema, API and event compatibility changes.
 - Include rollback or downgrade considerations for migrations.
 - Do not weaken a quality or security gate without an ADR.
+- Regenerate both lock files in Python 3.12 and review the dependency diff when
+  changing project requirements.

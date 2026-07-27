@@ -1,9 +1,10 @@
 PYTHON ?= python3
 
-.PHONY: install migrate seed run test lint typecheck security verify acceptance acceptance-chapter-03 acceptance-chapter-04 acceptance-chapter-05 acceptance-chapter-06 acceptance-chapter-07 acceptance-chapter-08 acceptance-chapter-09 observability-up observability-down compose-up compose-down
+.PHONY: install migrate seed run test lint typecheck security verify acceptance acceptance-chapter-03 acceptance-chapter-04 acceptance-chapter-05 acceptance-chapter-06 acceptance-chapter-07 acceptance-chapter-08 acceptance-chapter-09 acceptance-chapter-10 release-evidence observability-up observability-down compose-up compose-down
 
 install:
-	$(PYTHON) -m pip install -e ".[dev]"
+	$(PYTHON) -m pip install --require-hashes -r requirements-dev.lock
+	$(PYTHON) -m pip install --no-deps -e .
 
 migrate:
 	$(PYTHON) -m alembic upgrade head
@@ -53,6 +54,14 @@ acceptance-chapter-08:
 
 acceptance-chapter-09:
 	./scripts/acceptance-chapter-09.sh
+
+acceptance-chapter-10:
+	./scripts/acceptance-chapter-10.sh
+
+release-evidence:
+	$(PYTHON) -m caseops.release_evidence \
+		--source-commit "$$(git rev-parse HEAD)" \
+		--source-ref "$$(git describe --tags --exact-match 2>/dev/null || git branch --show-current)"
 
 observability-up:
 	docker compose -f compose.yaml -f deploy/compose.observability.yaml up --build -d

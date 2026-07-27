@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.9.0
+release: v1.0.0
 services:
   api:
     image: caseops-api
@@ -68,3 +68,16 @@ operations:
   gameday_scenario: a2a-dependency-interruption-and-recovery
   report: artifacts/operations/chapter-09-gameday.json
   acceptance: scripts/acceptance-chapter-09.sh
+delivery:
+  clean_room_acceptance: scripts/acceptance-chapter-10.sh
+  release_workflow: .github/workflows/release.yml
+  image: ghcr.io/datapro-lgtm/production-grade-multi-agent-caseops
+  image_identity: immutable-digest
+  sbom_format: SPDX-2.3-JSON
+  provenance: GitHub-Sigstore-artifact-attestation
+  release_manifest: artifacts/release/release-evidence.json
+  checksums: artifacts/release/SHA256SUMS
+  consumer_verification:
+    - sha256sum --check SHA256SUMS
+    - gh attestation verify caseops-v1.0.0-release.tar.gz --repo dataPro-lgtm/production-grade-multi-agent-caseops
+    - gh attestation verify oci://ghcr.io/datapro-lgtm/production-grade-multi-agent-caseops:v1.0.0 --repo dataPro-lgtm/production-grade-multi-agent-caseops
