@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from prometheus_client import CollectorRegistry, Counter, Histogram
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram, Info
 
 
 @dataclass(slots=True)
@@ -16,6 +16,10 @@ class ApiMetrics:
     agent_steps: Histogram
     collaboration_runs: Counter
     context_runs: Counter
+    inflight: Gauge
+    deadline_rejections: Counter
+    dependency_ready: Gauge
+    build: Info
 
     @classmethod
     def create(cls) -> ApiMetrics:
@@ -62,6 +66,28 @@ class ApiMetrics:
                 "caseops_context_runs_total",
                 "Context investigations by verdict and replay state",
                 ("verdict", "replayed"),
+                registry=registry,
+            ),
+            inflight=Gauge(
+                "caseops_http_inflight_requests",
+                "HTTP requests currently executing",
+                registry=registry,
+            ),
+            deadline_rejections=Counter(
+                "caseops_request_deadline_rejections_total",
+                "Requests rejected before business execution by deadline state",
+                ("reason",),
+                registry=registry,
+            ),
+            dependency_ready=Gauge(
+                "caseops_dependency_ready",
+                "Dependency readiness where 1 is usable and 0 is unavailable",
+                ("dependency", "critical"),
+                registry=registry,
+            ),
+            build=Info(
+                "caseops_build",
+                "CaseOps build and runtime identity",
                 registry=registry,
             ),
         )

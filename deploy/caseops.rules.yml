@@ -1,0 +1,52 @@
+groups:
+  - name: caseops-sli
+    interval: 30s
+    rules:
+      - record: caseops:http_requests:rate5m
+        expr: sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics"}[5m]))
+      - record: caseops:http_errors:rate5m
+        expr: sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics",status=~"5.."}[5m]))
+      - record: caseops:http_error_ratio:rate5m
+        expr: caseops:http_errors:rate5m / clamp_min(caseops:http_requests:rate5m, 0.000001)
+      - record: caseops:http_latency_seconds:p95_5m
+        expr: histogram_quantile(0.95, sum by (le) (rate(caseops_http_request_duration_seconds_bucket{route!~"/health/.*|/metrics"}[5m])))
+
+  - name: caseops-slo
+    interval: 30s
+    rules:
+      - alert: CaseOpsAvailabilityFastBurn
+        expr: |
+          (
+            sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics",status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics"}[5m])), 0.000001)
+          ) > (14.4 * 0.005)
+          and
+          (
+            sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics",status=~"5.."}[1h]))
+            /
+            clamp_min(sum(rate(caseops_http_requests_total{route!~"/health/.*|/metrics"}[1h])), 0.000001)
+          ) > (14.4 * 0.005)
+        for: 2m
+        labels:
+          severity: page
+          slo: availability-99.5
+        annotations:
+          summary: CaseOps 正在快速消耗可用性错误预算
+          runbook_url: https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops/blob/main/docs/chapter-05-runbook.md
+      - alert: CaseOpsCriticalDependencyUnavailable
+        expr: caseops_dependency_ready{critical="true"} == 0
+        for: 1m
+        labels:
+          severity: page
+        annotations:
+          summary: CaseOps 关键依赖不可用
+          runbook_url: https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops/blob/main/docs/chapter-05-runbook.md
+      - alert: CaseOpsOptionalDependencyDegraded
+        expr: caseops_dependency_ready{critical="false"} == 0
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: CaseOps 可降级依赖持续不可用
+          runbook_url: https://github.com/dataPro-lgtm/production-grade-multi-agent-caseops/blob/main/docs/chapter-05-runbook.md

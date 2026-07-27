@@ -20,6 +20,7 @@ from caseops.infrastructure.models import (
     new_id,
 )
 from caseops.infrastructure.repositories import SqlAlchemyCaseRepository
+from caseops.platform.runtime_envelope import current_deadline
 from caseops.service import Principal
 
 from .contracts import (
@@ -277,10 +278,20 @@ class CollaborationService:
         task: DelegationTask,
         principal: Principal,
     ) -> SpecialistResult | tuple[TaskStatus, str, str]:
+        timeout_seconds = min(
+            self._settings.collaboration_task_timeout_seconds,
+            max(0.0, (task.deadline_at - datetime.now(UTC)).total_seconds()),
+        )
+        if timeout_seconds <= 0:
+            return (
+                TaskStatus.TIMED_OUT,
+                "REQUEST_DEADLINE_EXCEEDED",
+                "request deadline expired before specialist dispatch",
+            )
         try:
             return await asyncio.wait_for(
                 gateway.execute(task=task, principal=principal),
-                timeout=self._settings.collaboration_task_timeout_seconds,
+                timeout=timeout_seconds,
             )
         except TimeoutError:
             return (
@@ -307,6 +318,9 @@ class CollaborationService:
         goal: str,
     ) -> tuple[DelegationTask, ...]:
         deadline = datetime.now(UTC) + timedelta(seconds=30)
+        request_deadline = current_deadline()
+        if request_deadline is not None:
+            deadline = min(deadline, request_deadline)
         definitions = (
             (
                 SpecialistId.COVERAGE,

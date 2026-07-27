@@ -23,6 +23,10 @@ from caseops.errors import (
     PolicyNotFound,
 )
 from caseops.logging_config import configure_logging
+from caseops.platform.runtime_envelope import (
+    RuntimeEnvelopeMiddleware,
+    TelemetryRuntime,
+)
 
 from .auth import AuthenticationFailed
 from .observability import ApiMetrics, RequestTimer
@@ -63,6 +67,10 @@ def create_app(
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings.log_level)
     resolved_engine = engine or build_engine(resolved_settings)
+    telemetry = TelemetryRuntime(
+        settings=resolved_settings,
+        service_name=resolved_settings.service_name,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -76,6 +84,7 @@ def create_app(
         )
         yield
         resolved_engine.dispose()
+        telemetry.shutdown()
         logger.info("service_stopped")
 
     app = FastAPI(
@@ -87,7 +96,9 @@ def create_app(
             "tool state machine and governed MCP execution; Slice 2 adds typed "
             "delegation, A2A specialists, deterministic evidence join, and events; "
             "Slice 3 adds governed hybrid retrieval, graph paths, Context Packs, "
-            "claim-citation binding, and Context Trace."
+            "claim-citation binding, and Context Trace; Slice 4 adds runtime "
+            "deadlines, dependency-aware readiness, OpenTelemetry, SLO rules, "
+            "and verified PostgreSQL recovery."
         ),
         lifespan=lifespan,
     )
@@ -95,6 +106,20 @@ def create_app(
     app.state.engine = resolved_engine
     app.state.session_factory = build_session_factory(resolved_engine)
     app.state.metrics = ApiMetrics.create()
+    app.state.metrics.build.info(
+        {
+            "service": resolved_settings.service_name,
+            "version": resolved_settings.service_version,
+            "environment": resolved_settings.environment,
+        }
+    )
+    app.state.telemetry = telemetry
+    app.add_middleware(
+        RuntimeEnvelopeMiddleware,
+        runtime=telemetry,
+        default_timeout_seconds=resolved_settings.request_default_timeout_seconds,
+        max_timeout_seconds=resolved_settings.request_max_timeout_seconds,
+    )
 
     @app.middleware("http")
     async def request_context(
@@ -107,6 +132,7 @@ def create_app(
         )
         request.state.request_id = request_id
         timer = RequestTimer()
+        app.state.metrics.inflight.inc()
         response: Response
         try:
             response = await call_next(request)
@@ -121,8 +147,13 @@ def create_app(
             )
             raise
         finally:
+            app.state.metrics.inflight.dec()
             route = request.scope.get("route")
             route_path = getattr(route, "path", "unmatched")
+        if response.status_code == status.HTTP_408_REQUEST_TIMEOUT:
+            app.state.metrics.deadline_rejections.labels(reason="expired").inc()
+        elif response.status_code == status.HTTP_400_BAD_REQUEST:
+            app.state.metrics.deadline_rejections.labels(reason="invalid").inc()
         response.headers["X-Request-ID"] = request_id
         app.state.metrics.requests.labels(
             method=request.method,
@@ -141,6 +172,11 @@ def create_app(
                 "route": route_path,
                 "status_code": response.status_code,
                 "duration_seconds": round(timer.elapsed(), 6),
+                "trace_id": response.headers.get("X-Trace-ID", "unavailable"),
+                "request_deadline": response.headers.get(
+                    "X-Request-Deadline",
+                    "unavailable",
+                ),
             },
         )
         return response

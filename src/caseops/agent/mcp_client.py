@@ -8,6 +8,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from caseops.config import Settings
+from caseops.platform.runtime_envelope import inject_runtime_headers, remaining_seconds
 from caseops.service import Principal
 
 from .mcp_auth import DelegationTokenIssuer
@@ -36,7 +37,12 @@ class MCPToolExecutor:
         validated = validate_arguments(tool_name, arguments)
         token = self._issuer.issue(principal=principal, task_id=run_id)
         headers = {"Authorization": f"Bearer {token}"}
-        timeout = httpx.Timeout(self._settings.agent_tool_timeout_seconds)
+        inject_runtime_headers(headers)
+        timeout_seconds = max(
+            0.001,
+            remaining_seconds(ceiling=self._settings.agent_tool_timeout_seconds),
+        )
+        timeout = httpx.Timeout(timeout_seconds)
         try:
             async with (
                 httpx.AsyncClient(
@@ -51,9 +57,7 @@ class MCPToolExecutor:
                 ClientSession(
                     read_stream,
                     write_stream,
-                    read_timeout_seconds=timedelta(
-                        seconds=self._settings.agent_tool_timeout_seconds
-                    ),
+                    read_timeout_seconds=timedelta(seconds=timeout_seconds),
                 ) as session,
             ):
                 await session.initialize()

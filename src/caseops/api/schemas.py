@@ -180,7 +180,16 @@ class ProblemDetails(BaseModel):
     request_id: str
 
 
+class DependencyHealth(BaseModel):
+    name: str
+    status: Literal["ok", "degraded", "unavailable", "disabled"]
+    critical: bool
+    latency_ms: float = Field(ge=0)
+    detail: str
+
+
 class HealthResponse(BaseModel):
-    status: Literal["ok"]
+    status: Literal["ok", "degraded", "unavailable"]
     service: str
     version: str
+    checks: tuple[DependencyHealth, ...] = ()

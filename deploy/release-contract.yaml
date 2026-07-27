@@ -1,0 +1,36 @@
+schema_version: caseops.release-contract.v1
+release: v0.5.0
+services:
+  api:
+    image: caseops-api
+    startup_probe: /health/startup
+    liveness_probe: /health/live
+    readiness_probe: /health/ready
+    termination_grace_seconds: 30
+  a2a:
+    image: caseops-a2a
+    liveness_probe: /health/live
+    termination_grace_seconds: 30
+  mcp:
+    image: caseops-mcp
+    liveness_probe: /health/live
+    termination_grace_seconds: 30
+state:
+  transactional_source_of_truth:
+    owner: postgres
+    migration_head: "0004"
+    backup_format: postgresql-custom
+    restore_verification: scripts/restore-drill-chapter-05.sh
+slo:
+  availability:
+    objective: 0.995
+    window: 30d
+    indicator: successful non-health HTTP requests / all non-health HTTP requests
+  latency:
+    objective: 0.95
+    threshold_seconds: 2
+    window: 30d
+telemetry:
+  propagation: W3C Trace Context
+  collector_protocol: OTLP/HTTP
+  metric_cardinality_policy: no tenant, case, user, task, or trace identifiers in labels

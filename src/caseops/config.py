@@ -16,13 +16,20 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     service_name: str = "caseops-api"
-    service_version: str = "0.4.0"
+    service_version: str = "0.5.0"
     database_url: str = "sqlite+pysqlite:///./caseops.db"
     api_keys: dict[str, str] = Field(
         default_factory=lambda: {"caseops-local-dev-key": "tenant-demo"}
     )
     log_level: str = "INFO"
     expose_metrics: bool = True
+    request_default_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    request_max_timeout_seconds: float = Field(default=60.0, gt=0, le=600)
+    readiness_remote_checks: bool = False
+    readiness_timeout_seconds: float = Field(default=1.0, gt=0, le=5)
+    expected_database_revision: str = "0004"
+    otel_exporter_otlp_traces_endpoint: str | None = None
+    otel_batch_export_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     agent_planner: Literal["conformance", "openai"] = "conformance"
     agent_tool_transport: Literal["direct", "mcp"] = "direct"
     agent_max_steps: int = Field(default=8, ge=1, le=32)
@@ -57,6 +64,8 @@ class Settings(BaseSettings):
                 raise ValueError("production 环境必须配置独立的任务令牌签名密钥")
         if not self.api_keys:
             raise ValueError("至少配置一个 API Key 到租户的映射")
+        if self.request_default_timeout_seconds > self.request_max_timeout_seconds:
+            raise ValueError("默认请求超时不能大于最大请求超时")
         if self.agent_planner == "openai" and not self.openai_api_key:
             raise ValueError("使用 openai planner 时必须配置 CASEOPS_OPENAI_API_KEY")
         return self

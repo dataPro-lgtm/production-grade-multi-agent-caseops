@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 3
+## 当前里程碑：Slice 4
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -32,7 +32,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 7. 最终三条 Claim 均绑定 Context Pack 内的 Evidence ID；
 8. 过期规则和带提示注入的外部邮件会进入 Context Trace，但不会进入 Context Pack。
 
-模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面正确性。
+第 5 章的 Slice 4 把“服务能启动”升级为“运行保证可执行、可观测、可恢复”：
+
+1. API、A2A、MCP 统一接收并传播 W3C Trace Context；
+2. 相对 timeout 在入口转换为绝对 deadline，下游只能消耗剩余预算；
+3. liveness、startup、readiness 分离，数据库是关键依赖，A2A/MCP 是可降级依赖；
+4. OpenTelemetry Collector 汇聚跨服务 Trace，Tempo 保存因果链；
+5. Prometheus 使用低基数 SLI、错误率记录规则和面向用户症状的告警；
+6. Grafana 预置运行看板，可从请求指标跳转到 Trace；
+7. PostgreSQL 备份包含版本与哈希清单，恢复在隔离数据库验证内容签名和业务不变量；
+8. 一键验收会真实停止 A2A、观察降级、重启服务并完成恢复演练。
+
+模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面或运行保证的正确性。
 
 ## 一键运行
 
@@ -44,7 +55,14 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-04
+make acceptance-chapter-05
+```
+
+如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
+
+```bash
+make observability-up
+make acceptance-chapter-05
 ```
 
 运行接口：
@@ -53,13 +71,17 @@ make acceptance-chapter-04
 |---|---|
 | `http://localhost:8080/docs` | OpenAPI 交互文档 |
 | `http://localhost:8080/health/live` | API 存活检查 |
-| `http://localhost:8080/health/ready` | API 与数据库就绪检查 |
+| `http://localhost:8080/health/startup` | 数据库迁移启动检查 |
+| `http://localhost:8080/health/ready` | 关键与可选依赖就绪检查 |
 | `http://localhost:8080/metrics` | Prometheus 指标 |
 | `http://localhost:8081/health/live` | MCP 服务存活检查 |
 | `http://localhost:8081/mcp` | 受 Bearer 保护的 MCP endpoint |
 | `http://localhost:8082/health/live` | A2A 服务存活检查 |
 | `http://localhost:8082/.well-known/agent-card.json` | A2A Agent Card |
 | `http://localhost:8082/a2a/rest` | A2A 1.0 HTTP+JSON endpoint |
+| `http://localhost:3200/ready` | Tempo 就绪检查 |
+| `http://localhost:9090/rules` | Prometheus 记录与告警规则 |
+| `http://localhost:3300` | Grafana 本地仪表盘 |
 
 手工发起受治理的 Context Investigation：
 
@@ -100,7 +122,7 @@ curl --fail-with-body \
 
 使用相同幂等键再次请求会返回相同 `run_id` 和 `pack_id`，且 `replayed=true`，不会重新检索和构建 Context Pack。
 
-完整命令、来源清单、图关系、Context Trace 和门禁验证见 [第 4 章运行手册](docs/chapter-04-runbook.md)。
+完整的 Trace、SLO、故障降级与恢复验证见 [第 5 章运行手册](docs/chapter-05-runbook.md)。
 
 ## 控制面
 
@@ -197,7 +219,9 @@ make security
 - PostgreSQL 迁移与种子数据验证；
 - 非 root、只读文件系统容器构建；
 - API → A2A → MCP → PostgreSQL 端到端验收；
-- Context Pipeline → PostgreSQL FTS / Graph → Context Pack 端到端验收。
+- Context Pipeline → PostgreSQL FTS / Graph → Context Pack 端到端验收；
+- API → A2A → MCP 跨服务 W3C Trace 与 deadline 验收；
+- Prometheus SLO 规则、依赖降级和 PostgreSQL 隔离恢复演练。
 
 ## 设计文档
 
@@ -206,9 +230,11 @@ make security
 - [ADR-0002：先建设 Agent 控制面，再提高模型自治](docs/adr/0002-control-plane-before-model-autonomy.md)
 - [ADR-0003：由 Supervisor 持有收敛权](docs/adr/0003-supervisor-owns-convergence.md)
 - [ADR-0004：Context Pack 是受治理的证据产品](docs/adr/0004-context-pack-is-a-governed-evidence-product.md)
+- [ADR-0005：把生产级定义为可执行的运行保证](docs/adr/0005-production-is-an-executable-runtime-guarantee.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
 - [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
 - [第 4 章运行与验收手册](docs/chapter-04-runbook.md)
+- [第 5 章运行与恢复验收手册](docs/chapter-05-runbook.md)
 
 ## “生产级”的准确含义
 
@@ -216,7 +242,7 @@ make security
 
 - 真实身份提供方、组织权限和完整 OAuth 2.1 授权服务器接入；
 - 指定地区和行业的合规认证；
-- 经过实测的容量规划、SLO、多副本拓扑与灾备指标；
+- 经过真实业务流量校准的容量规划、多副本拓扑和跨区域灾备指标；
 - 写工具的业务幂等、效果账本和审批闭环；
 - 长任务异步 API、跨进程 Supervisor 恢复与 Broker 消费端；
 - 经过领域语料评测的 embedding provider、向量索引和默认 vector channel；

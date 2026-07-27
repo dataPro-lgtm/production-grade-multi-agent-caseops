@@ -1,20 +1,27 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import urlsplit
 
+import uvicorn
 from mcp.server.auth.middleware.auth_context import get_access_token
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from caseops.config import Settings, get_settings
 from caseops.database import build_engine, build_session_factory
+from caseops.platform.runtime_envelope import (
+    RuntimeEnvelopeMiddleware,
+    TelemetryRuntime,
+)
 
 from .mcp_auth import DelegationTokenVerifier
 from .tools import (
@@ -187,7 +194,29 @@ def main() -> None:
     engine = build_engine(settings)
     factory = build_session_factory(engine)
     server = create_mcp_server(settings=settings, factory=factory)
-    server.run(transport="streamable-http")
+    telemetry = TelemetryRuntime(settings=settings, service_name="caseops-mcp")
+    app = server.streamable_http_app()
+    original_lifespan = app.router.lifespan_context
+
+    @asynccontextmanager
+    async def lifespan(application: Starlette) -> AsyncIterator[None]:
+        async with original_lifespan(application):
+            yield
+        telemetry.shutdown()
+
+    app.router.lifespan_context = lifespan
+    app.add_middleware(
+        RuntimeEnvelopeMiddleware,
+        runtime=telemetry,
+        default_timeout_seconds=settings.request_default_timeout_seconds,
+        max_timeout_seconds=settings.request_max_timeout_seconds,
+    )
+    uvicorn.run(
+        app,
+        host=settings.mcp_host,
+        port=settings.mcp_port,
+        log_level=settings.log_level.lower(),
+    )
 
 
 if __name__ == "__main__":

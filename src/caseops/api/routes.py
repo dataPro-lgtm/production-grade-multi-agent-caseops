@@ -6,8 +6,6 @@ from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Header, Request, Response, status
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from caseops.agent.service import AgentRunService
@@ -17,6 +15,7 @@ from caseops.context.service import ContextInvestigationService
 from caseops.service import InvestigationService, Principal
 
 from .auth import authenticate
+from .health import evaluate_readiness, evaluate_startup
 from .schemas import (
     AgentRunCreate,
     AgentRunResponse,
@@ -61,18 +60,21 @@ def liveness(request: Request) -> HealthResponse:
     responses={503: {"model": ProblemDetails}},
 )
 def readiness(request: Request, response: Response) -> HealthResponse:
-    settings = request.app.state.settings
-    try:
-        with request.app.state.engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-    except SQLAlchemyError:
-        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
-        raise
-    return HealthResponse(
-        status="ok",
-        service=settings.service_name,
-        version=settings.service_version,
-    )
+    evaluation = evaluate_readiness(request)
+    response.status_code = evaluation.status_code
+    return evaluation.response
+
+
+@router.get(
+    "/health/startup",
+    response_model=HealthResponse,
+    tags=["health"],
+    responses={503: {"model": HealthResponse}},
+)
+def startup(request: Request, response: Response) -> HealthResponse:
+    evaluation = evaluate_startup(request)
+    response.status_code = evaluation.status_code
+    return evaluation.response
 
 
 @router.get("/metrics", include_in_schema=False)

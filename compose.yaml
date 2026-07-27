@@ -16,6 +16,7 @@ services:
       - caseops-postgres:/var/lib/postgresql/data
     networks:
       - caseops
+    stop_grace_period: 30s
 
   migrate:
     build:
@@ -73,6 +74,11 @@ services:
       start_period: 10s
       retries: 5
     restart: unless-stopped
+    init: true
+    pids_limit: 256
+    stop_grace_period: 30s
+    mem_limit: 512m
+    cpus: 1.0
     networks:
       - caseops
 
@@ -87,6 +93,8 @@ services:
       CASEOPS_RUN_MIGRATIONS: "false"
       CASEOPS_LOG_LEVEL: INFO
       CASEOPS_EXPOSE_METRICS: "true"
+      CASEOPS_READINESS_REMOTE_CHECKS: "true"
+      CASEOPS_EXPECTED_DATABASE_REVISION: "0004"
       CASEOPS_FORWARDED_ALLOW_IPS: 127.0.0.1
       CASEOPS_AGENT_PLANNER: conformance
       CASEOPS_AGENT_TOOL_TRANSPORT: mcp
@@ -110,6 +118,11 @@ services:
     cap_drop:
       - ALL
     restart: unless-stopped
+    init: true
+    pids_limit: 256
+    stop_grace_period: 30s
+    mem_limit: 512m
+    cpus: 1.0
     networks:
       - caseops
 
@@ -157,6 +170,11 @@ services:
       start_period: 10s
       retries: 5
     restart: unless-stopped
+    init: true
+    pids_limit: 256
+    stop_grace_period: 30s
+    mem_limit: 512m
+    cpus: 1.0
     networks:
       - caseops
 

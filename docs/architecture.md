@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 3
+## 当前边界：Slice 4
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -73,6 +73,29 @@ Evidence Sufficiency
 Context Pack ── Claim-Citation Binding ── Context Trace
   ▼
 context_runs + Audit + CloudEvents Outbox
+```
+
+Slice 4 的运行保证：
+
+```text
+Client traceparent + timeout/deadline
+  ▼
+Runtime Envelope
+  │ absolute deadline · trace id · remaining budget
+  ▼
+API ───────────────► A2A ───────────────► MCP
+ │                     │                    │
+ └──────── OpenTelemetry spans ─────────────┘
+                       ▼
+                OTel Collector ──► Tempo
+
+Prometheus ◄── /metrics + low-cardinality SLI ── API
+    │
+    └── recording rules + error-budget alerts ──► Grafana
+
+PostgreSQL ──► custom dump + manifest
+    │
+    └──► isolated restore ──► revision + signature + business invariant
 ```
 
 ## 执行与验证路径
@@ -173,15 +196,20 @@ Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前
 | 上下文门禁 | scope、purpose、as-of、hash、信任、去重与 token budget |
 | 证据 | Context Pack、Claim-Citation Binding 与逐候选 Context Trace |
 | 模型隔离 | Responses API 仅返回提议或终态；不持有数据库凭据 |
+| 时间预算 | 相对 timeout 转换为绝对 deadline；跨 API/A2A/MCP 单调递减 |
+| 健康语义 | liveness、startup、readiness 分离；关键依赖失败与可选依赖降级分开表达 |
+| 分布式追踪 | W3C Trace Context、OpenTelemetry SDK、Collector 与 Tempo |
+| SLI/SLO | 低基数请求指标、记录规则、错误预算快速燃烧与依赖告警 |
+| 数据恢复 | 带哈希清单的 custom dump、隔离恢复、内容签名和业务不变量 |
 | 质量门禁 | Ruff、Mypy strict、pytest、分支覆盖率、Bandit、pip-audit、容器验收 |
 
 ## 尚未声称完成
 
 - 本地任务令牌使用共享密钥签名，是开发环境的 STS 替身；企业 OIDC、密钥轮换与完整 OAuth 2.1 授权服务器在安全章节接入；
 - 当前工具全部只读，外部副作用、审批与 Effect Ledger 在后续切片实现；
-- 目前由 API 请求同步等待三个专业 Agent；面向长任务的异步提交、回调与跨进程恢复将在平台化切片加入；
+- 目前由 API 请求同步等待三个专业 Agent；Slice 4 让同步等待受绝对 deadline 约束，但面向长任务的异步提交、回调与跨进程 Supervisor 恢复仍未实现；
 - OpenAI 适配器有契约测试，但没有 API Key 时不声称完成真实模型在线验收；
-- 当前没有容量报告、多副本会话池、备份恢复证明或生产 SLO。
+- Slice 4 已提供本地 SLI/SLO 规则和隔离恢复证据，但没有真实生产流量容量报告、多副本会话池、PITR 或跨区域灾备指标；
 - 当前未启用 vector channel；需先交付 embedding 版本、真实领域语料、ACL 过滤策略和可复现检索评测。
 
 这些限制是显式演进项，不用 Prompt 或文档承诺替代代码证据。

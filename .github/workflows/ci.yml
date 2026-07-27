@@ -66,3 +66,18 @@ jobs:
 
       - name: Build runtime image
         run: docker build --tag caseops:${{ github.sha }} .
+
+      - name: Validate Compose platform contract
+        run: |
+          docker compose \
+            -f compose.yaml \
+            -f deploy/compose.observability.yaml \
+            config --quiet
+
+      - name: Validate Prometheus rules
+        run: |
+          docker run --rm \
+            --entrypoint /bin/promtool \
+            -v "$PWD/deploy:/etc/caseops:ro" \
+            prom/prometheus:v3.12.0 \
+            check rules /etc/caseops/caseops.rules.yml

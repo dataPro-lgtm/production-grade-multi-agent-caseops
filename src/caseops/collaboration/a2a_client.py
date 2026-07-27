@@ -9,6 +9,7 @@ from a2a.types import Message, Part, Role, SendMessageRequest, Task
 
 from caseops.agent.mcp_auth import DelegationTokenIssuer
 from caseops.config import Settings
+from caseops.platform.runtime_envelope import inject_runtime_headers, remaining_seconds
 from caseops.service import Principal
 
 from .contracts import DelegationTask, SpecialistResult
@@ -40,14 +41,28 @@ class A2ASpecialistGateway:
             resource=self._settings.a2a_resource,
             scopes=frozenset(task.required_scopes),
         )
-        timeout = httpx.Timeout(self._settings.collaboration_task_timeout_seconds)
+        timeout = httpx.Timeout(
+            max(
+                0.001,
+                remaining_seconds(
+                    ceiling=self._settings.collaboration_task_timeout_seconds
+                ),
+            )
+        )
+        trace_headers: dict[str, str] = {}
+        inject_runtime_headers(trace_headers)
+        authenticated_headers = {
+            **trace_headers,
+            "Authorization": f"Bearer {token}",
+        }
         async with (
             httpx.AsyncClient(
+                headers=trace_headers,
                 timeout=timeout,
                 transport=self._transport,
             ) as discovery_client,
             httpx.AsyncClient(
-                headers={"Authorization": f"Bearer {token}"},
+                headers=authenticated_headers,
                 timeout=timeout,
                 transport=self._transport,
             ) as authenticated_client,

@@ -38,6 +38,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from caseops.agent.mcp_auth import verify_task_token
 from caseops.config import Settings, get_settings
 from caseops.database import build_engine, build_session_factory
+from caseops.platform.runtime_envelope import (
+    RuntimeEnvelopeMiddleware,
+    TelemetryRuntime,
+)
 from caseops.service import Principal
 
 from .contracts import DelegationTask
@@ -277,6 +281,7 @@ def create_a2a_app(
         title="CaseOps A2A specialists",
         version=settings.service_version,
     )
+    telemetry = TelemetryRuntime(settings=settings, service_name="caseops-a2a")
 
     @app.get("/health/live")
     async def health() -> dict[str, str]:
@@ -298,6 +303,13 @@ def create_a2a_app(
     if async_engine is not None:
         app.router.add_event_handler("shutdown", async_engine.dispose)
     app.add_middleware(BearerTaskTokenMiddleware, settings=settings)
+    app.add_middleware(
+        RuntimeEnvelopeMiddleware,
+        runtime=telemetry,
+        default_timeout_seconds=settings.request_default_timeout_seconds,
+        max_timeout_seconds=settings.request_max_timeout_seconds,
+    )
+    app.router.add_event_handler("shutdown", telemetry.shutdown)
     return app
 
 

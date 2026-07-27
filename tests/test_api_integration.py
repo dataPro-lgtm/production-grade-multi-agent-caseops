@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlalchemy import create_engine, func, select
@@ -65,7 +66,57 @@ class ApiIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(live.status_code, 200)
         self.assertEqual(ready.status_code, 200)
+        self.assertEqual(ready.json()["status"], "ok")
+        self.assertEqual(
+            {item["name"]: item["status"] for item in ready.json()["checks"]},
+            {"database": "ok", "mcp": "disabled", "a2a": "disabled"},
+        )
         self.assertIn("caseops_http_requests_total", metrics.text)
+        self.assertIn("caseops_build_info", metrics.text)
+
+    async def test_runtime_envelope_propagates_trace_and_bounded_deadline(self) -> None:
+        trace_id = "1" * 32
+        response = await self.client.get(
+            "/health/live",
+            headers={
+                "traceparent": f"00-{trace_id}-{'2' * 16}-01",
+                "X-Request-Timeout-Ms": "120000",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["x-trace-id"], trace_id)
+        deadline = datetime.fromisoformat(response.headers["x-request-deadline"])
+        remaining = deadline - datetime.now(UTC)
+        self.assertGreater(remaining, timedelta(seconds=55))
+        self.assertLessEqual(remaining, timedelta(seconds=60))
+
+    async def test_expired_or_ambiguous_deadline_is_rejected_before_handler(
+        self,
+    ) -> None:
+        expired = await self.client.get(
+            "/health/live",
+            headers={"X-Request-Deadline": "2020-01-01T00:00:00Z"},
+        )
+        ambiguous = await self.client.get(
+            "/health/live",
+            headers={
+                "X-Request-Deadline": "2030-01-01T00:00:00Z",
+                "X-Request-Timeout-Ms": "1000",
+            },
+        )
+
+        self.assertEqual(expired.status_code, 408)
+        self.assertEqual(expired.json()["code"], "REQUEST_DEADLINE_EXCEEDED")
+        self.assertEqual(ambiguous.status_code, 400)
+        self.assertEqual(ambiguous.json()["code"], "INVALID_REQUEST_DEADLINE")
+
+    async def test_startup_fails_when_database_revision_is_not_proven(self) -> None:
+        response = await self.client.get("/health/startup")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "unavailable")
+        self.assertEqual(response.json()["checks"][0]["name"], "database_schema")
 
     async def test_investigation_is_persisted_with_audit_and_outbox(self) -> None:
         response = await self._investigate("book-ch01-c102-0001")
