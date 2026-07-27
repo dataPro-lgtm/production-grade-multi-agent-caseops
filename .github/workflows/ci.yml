@@ -49,6 +49,9 @@ jobs:
       - name: Unit, integration, and contract tests
         run: pytest --cov=caseops --cov-report=term-missing --cov-report=xml
 
+      - name: Deterministic agent-security red team
+        run: python -m caseops.security.red_team --json
+
       - name: Validate PostgreSQL migrations and seed
         env:
           CASEOPS_ENVIRONMENT: test

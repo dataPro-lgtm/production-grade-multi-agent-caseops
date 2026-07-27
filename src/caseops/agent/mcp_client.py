@@ -35,7 +35,11 @@ class MCPToolExecutor:
         arguments: dict[str, Any],
     ) -> dict[str, Any]:
         validated = validate_arguments(tool_name, arguments)
-        token = self._issuer.issue(principal=principal, task_id=run_id)
+        token = self._issuer.issue(
+            principal=principal,
+            task_id=run_id,
+            resource_id=str(validated["case_id"]),
+        )
         headers = {"Authorization": f"Bearer {token}"}
         inject_runtime_headers(headers)
         timeout_seconds = max(

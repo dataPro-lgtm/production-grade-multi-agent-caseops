@@ -40,6 +40,9 @@ class A2ASpecialistGateway:
             task_id=task.task_id,
             resource=self._settings.a2a_resource,
             scopes=frozenset(task.required_scopes),
+            resource_id=task.case_id,
+            purpose="case_investigation",
+            workload_id=f"caseops-specialist:{task.specialist_id.value}",
         )
         timeout = httpx.Timeout(
             max(

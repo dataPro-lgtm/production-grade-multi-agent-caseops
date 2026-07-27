@@ -45,6 +45,8 @@ with snapshot(entity, value) as (
   union all
   select 'knowledge_object', object_id || ':' || content_hash from knowledge_objects
   union all
+  select 'security_decision', id || ':' || context_digest from security_decisions
+  union all
   select 'outbox', id || ':' || topic || ':' || aggregate_id from outbox_events
 )
 select md5(coalesce(string_agg(entity || ':' || value, E'\n' order by entity, value), ''))
@@ -55,6 +57,9 @@ SQL
 source_signature=$(docker compose exec -T postgres \
   psql --username=caseops --dbname=caseops --tuples-only --no-align \
   --command="$signature_sql")
+source_revision=$(docker compose exec -T postgres \
+  psql --username=caseops --dbname=caseops --tuples-only --no-align \
+  --command="select version_num from alembic_version;")
 restored_signature=$(docker compose exec -T postgres \
   psql --username=caseops --dbname="$restore_db" --tuples-only --no-align \
   --command="$signature_sql")
@@ -69,8 +74,8 @@ if [ "$source_signature" != "$restored_signature" ]; then
   echo "restore signature does not match the source database" >&2
   exit 1
 fi
-if [ "$restored_revision" != "0004" ]; then
-  echo "restored schema revision is not 0004" >&2
+if [ "$restored_revision" != "$source_revision" ]; then
+  echo "restored schema revision does not match the source database" >&2
   exit 1
 fi
 if [ "$case_count" != "1" ]; then

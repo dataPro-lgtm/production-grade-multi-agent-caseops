@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 4
+## 当前边界：Slice 5
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -98,6 +98,34 @@ PostgreSQL ──► custom dump + manifest
     └──► isolated restore ──► revision + signature + business invariant
 ```
 
+Slice 5 的安全控制面：
+
+```text
+Untrusted goal / context
+          │ data, not authority
+          ▼
+Model / Agent proposes tool intent
+          ▼
+ToolGuard (default deny)
+  ├─ versioned manifest + definition digest
+  ├─ user scope ∩ workload scope ∩ delegation scope
+  ├─ purpose + resource + tenant + audience
+  ├─ risk + side effect + runtime allowlist
+  └─ global / per-tool kill switch
+          │
+     ┌────┴────┐
+   deny       allow
+     │          ▼
+ no effect   MCP read-only tool ──► PostgreSQL
+     └────┬─────┘
+          ▼
+ minimal security decision audit
+ policy/manifest/context/arguments digests + stable reason codes
+
+Structured output ──► OutputGuard ──► release | redact | block
+Red-team dataset ───► same controls ─► versioned acceptance report
+```
+
 ## 执行与验证路径
 
 | 路径 | 用途 | 是否调用外部模型 |
@@ -108,6 +136,7 @@ PostgreSQL ──► custom dump + manifest
 | `collaboration direct` | 单元与 API 集成测试，验证委托和 Join | 否 |
 | `collaboration a2a + mcp` | Docker 默认协作验收，验证完整协议链 | 否 |
 | `context structured + full_text + graph` | Docker 默认上下文验收，验证来源、时态、权限、证据与关系路径 | 否 |
+| `security red-team + live collaboration` | Docker 默认安全验收，验证权限交集、数据释放和注入隔离 | 否 |
 
 `ConformancePlanner` 是确定性的协议一致性驱动器，不伪装成 Agent。真实模型适配器使用 Responses API，但无论 planner 来自哪里，都必须经过同一套契约、授权、预算、MCP、账本和检查点。
 
@@ -183,6 +212,11 @@ Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前
 |---|---|
 | 租户边界 | API Principal 与 MCP 任务令牌双重绑定；工具参数不接收租户 |
 | 工具授权 | allowlist、scope、风险等级、案件资源边界四重检查 |
+| Tool Security Manifest | 工具版本、定义摘要、purpose、scope、资源、分类、风险与副作用绑定 |
+| 权限交集 | 用户、工作负载与本次委托 scope 取交集；委托签发不能扩权 |
+| 安全决策 | MCP 执行前默认拒绝；允许与拒绝均写最小化、摘要化审计 |
+| 隐私释放 | 邮箱与手机号最小化、canary secret 阻断、受限数据默认不释放 |
+| 安全回归 | 11 个版本化红队样例与真实间接提示注入隔离 |
 | 有限执行 | step、重复指纹、单工具超时与有限重试 |
 | 可恢复性 | durable checkpoint；只读崩溃窗口安全重放 |
 | 可审计性 | Agent run、每次工具执行、审计事件与 Outbox 均持久化 |
@@ -205,11 +239,12 @@ Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前
 
 ## 尚未声称完成
 
-- 本地任务令牌使用共享密钥签名，是开发环境的 STS 替身；企业 OIDC、密钥轮换与完整 OAuth 2.1 授权服务器在安全章节接入；
+- 本地任务令牌使用共享密钥签名，是开发环境的 STS 替身；企业 OIDC、非对称签名、密钥轮换、撤销和完整 OAuth 2.1 授权服务器仍需接入；
 - 当前工具全部只读，外部副作用、审批与 Effect Ledger 在后续切片实现；
 - 目前由 API 请求同步等待三个专业 Agent；Slice 4 让同步等待受绝对 deadline 约束，但面向长任务的异步提交、回调与跨进程 Supervisor 恢复仍未实现；
 - OpenAI 适配器有契约测试，但没有 API Key 时不声称完成真实模型在线验收；
 - Slice 4 已提供本地 SLI/SLO 规则和隔离恢复证据，但没有真实生产流量容量报告、多副本会话池、PITR 或跨区域灾备指标；
 - 当前未启用 vector channel；需先交付 embedding 版本、真实领域语料、ACL 过滤策略和可复现检索评测。
+- OutputGuard 已交付确定性组件和安全回归，但当前没有邮件、Webhook 或文件导出连接器；新增任何外发边界时必须接入释放策略与效果审计。
 
 这些限制是显式演进项，不用 Prompt 或文档承诺替代代码证据。

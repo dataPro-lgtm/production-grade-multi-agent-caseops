@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.5.0
+release: v0.6.0
 services:
   api:
     image: caseops-api
@@ -18,7 +18,7 @@ services:
 state:
   transactional_source_of_truth:
     owner: postgres
-    migration_head: "0004"
+    migration_head: "0005"
     backup_format: postgresql-custom
     restore_verification: scripts/restore-drill-chapter-05.sh
 slo:
@@ -34,3 +34,9 @@ telemetry:
   propagation: W3C Trace Context
   collector_protocol: OTLP/HTTP
   metric_cardinality_policy: no tenant, case, user, task, or trace identifiers in labels
+security:
+  tool_policy: caseops.tool-policy.2026-07
+  authorization: user scopes intersect workload scopes intersect delegation scopes
+  resource_binding: tenant and case
+  audit: hashed arguments and context, no raw tool payloads
+  red_team_acceptance: scripts/acceptance-chapter-06.sh

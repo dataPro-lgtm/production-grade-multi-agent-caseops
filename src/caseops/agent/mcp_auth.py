@@ -26,15 +26,29 @@ class DelegationTokenIssuer:
         task_id: str,
         resource: str | None = None,
         scopes: frozenset[str] | None = None,
+        resource_id: str = "*",
+        purpose: str = "case_investigation",
+        workload_id: str = "caseops-agent-runtime",
     ) -> str:
         now = int(time.time())
+        requested_scopes = scopes or principal.scopes
+        if not requested_scopes.issubset(principal.scopes):
+            raise ValueError("delegation cannot expand principal scopes")
+        scope_value = " ".join(sorted(requested_scopes))
         claims: dict[str, Any] = {
             "iss": self.settings.delegation_issuer,
             "aud": resource or self.settings.mcp_resource,
             "sub": principal.actor_id,
             "tenant_id": principal.tenant_id,
             "task_id": task_id,
-            "scope": " ".join(sorted(scopes or principal.scopes)),
+            "scope": scope_value,
+            "user_scope": " ".join(sorted(principal.scopes)),
+            "workload_scope": scope_value,
+            "delegation_scope": scope_value,
+            "workload_id": workload_id,
+            "purpose": purpose,
+            "resource_type": "case",
+            "resource_id": resource_id,
             "iat": now,
             "nbf": now - 5,
             "exp": now + self.settings.delegation_token_ttl_seconds,
@@ -89,7 +103,10 @@ def _base64url_encode(payload: bytes) -> str:
 
 def _base64url_decode(payload: str) -> bytes:
     padding = "=" * (-len(payload) % 4)
-    return base64.urlsafe_b64decode(payload + padding)
+    decoded = base64.urlsafe_b64decode(payload + padding)
+    if _base64url_encode(decoded) != payload:
+        raise ValueError("non-canonical base64url encoding")
+    return decoded
 
 
 def _encode_hs256(claims: dict[str, Any], key: str) -> str:
@@ -133,7 +150,24 @@ def _decode_hs256(
     if not isinstance(claims_raw, dict):
         raise ValueError("task token claims must be an object")
     claims: dict[str, Any] = {str(claim): value for claim, value in claims_raw.items()}
-    required = {"exp", "iat", "nbf", "sub", "tenant_id", "task_id", "iss", "aud"}
+    required = {
+        "exp",
+        "iat",
+        "nbf",
+        "sub",
+        "tenant_id",
+        "task_id",
+        "iss",
+        "aud",
+        "scope",
+        "user_scope",
+        "workload_scope",
+        "delegation_scope",
+        "workload_id",
+        "purpose",
+        "resource_type",
+        "resource_id",
+    }
     if not required.issubset(claims):
         raise ValueError("task token lacks required claims")
     now = int(time.time())

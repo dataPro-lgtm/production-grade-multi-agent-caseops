@@ -19,4 +19,8 @@ Never include real customer, claimant, credential or payment data in a report. A
 
 ## Scope notes
 
-The development API Key adapter is not a substitute for an enterprise identity provider. Production deployments must replace development credentials, protect secrets outside source control, terminate TLS at a trusted ingress, and complete a deployment-specific threat assessment.
+The development API Key and HS256 task-token adapters are not substitutes for an enterprise identity provider or security-token service. Production deployments must replace development credentials, use audience-bound short-lived tokens with managed key rotation and revocation, protect secrets outside source control, terminate TLS at a trusted ingress, and complete a deployment-specific threat assessment.
+
+Tool execution is default-deny and governed by versioned manifests plus the intersection of user, workload, and delegation scopes. Security decisions retain policy and content digests rather than raw prompts, arguments, or tool payloads.
+
+The repository ships only synthetic data and a synthetic `CASEOPS_CANARY_*` exfiltration marker. Never replace these fixtures with real customer or production secrets. The deterministic red-team dataset is a release baseline, not a claim of exhaustive penetration testing or regulatory compliance.

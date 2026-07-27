@@ -18,10 +18,14 @@ from starlette.responses import JSONResponse
 
 from caseops.config import Settings, get_settings
 from caseops.database import build_engine, build_session_factory
+from caseops.infrastructure.models import SecurityDecisionRecord
 from caseops.platform.runtime_envelope import (
     RuntimeEnvelopeMiddleware,
     TelemetryRuntime,
 )
+from caseops.security.contracts import SecurityContext
+from caseops.security.manifests import TOOL_SECURITY_MANIFESTS
+from caseops.security.tool_guard import ToolGuard
 
 from .mcp_auth import DelegationTokenVerifier
 from .tools import (
@@ -30,6 +34,7 @@ from .tools import (
     LIST_DOCUMENTS,
     LIST_RISK_SIGNALS,
     RESOLVE_ALIAS,
+    TOOL_REGISTRY,
     execute_database_tool,
 )
 
@@ -101,14 +106,27 @@ def create_mcp_server(
         )(function)
 
     def case_snapshot(case_id: str) -> dict[str, Any]:
-        return _execute(factory, GET_CASE, {"case_id": case_id}, "case:read")
+        return _execute(
+            factory,
+            settings,
+            GET_CASE,
+            {"case_id": case_id},
+            "case:read",
+        )
 
     def policy_requirements(case_id: str) -> dict[str, Any]:
-        return _execute(factory, GET_POLICY, {"case_id": case_id}, "policy:read")
+        return _execute(
+            factory,
+            settings,
+            GET_POLICY,
+            {"case_id": case_id},
+            "policy:read",
+        )
 
     def unclassified_documents(case_id: str) -> dict[str, Any]:
         return _execute(
             factory,
+            settings,
             LIST_DOCUMENTS,
             {"case_id": case_id},
             "document:read",
@@ -117,6 +135,7 @@ def create_mcp_server(
     def resolve_alias(case_id: str, document_id: str) -> dict[str, Any]:
         return _execute(
             factory,
+            settings,
             RESOLVE_ALIAS,
             {"case_id": case_id, "document_id": document_id},
             "document:resolve",
@@ -125,6 +144,7 @@ def create_mcp_server(
     def risk_signals(case_id: str) -> dict[str, Any]:
         return _execute(
             factory,
+            settings,
             LIST_RISK_SIGNALS,
             {"case_id": case_id},
             "risk:read",
@@ -165,6 +185,7 @@ def create_mcp_server(
 
 def _execute(
     factory: sessionmaker[Session],
+    settings: Settings,
     tool_name: str,
     arguments: dict[str, Any],
     required_scope: str,
@@ -178,6 +199,55 @@ def _execute(
     task_id = token.claims.get("task_id")
     if not isinstance(tenant_id, str) or not isinstance(task_id, str):
         raise PermissionError("task token lacks tenant or task binding")
+    definition = TOOL_REGISTRY.get(tool_name)
+    manifest = TOOL_SECURITY_MANIFESTS.get(tool_name)
+    decision = ToolGuard(policy_version=settings.tool_guard_policy_version).evaluate(
+        definition=definition,
+        manifest=manifest,
+        arguments=arguments,
+        context=SecurityContext(
+            tenant_id=tenant_id,
+            actor_id=str(token.claims.get("sub", "unknown")),
+            user_scopes=frozenset(str(token.claims.get("user_scope", "")).split()),
+            workload_id=str(token.claims.get("workload_id", "unknown")),
+            workload_scopes=frozenset(str(token.claims.get("workload_scope", "")).split()),
+            delegation_id=task_id,
+            delegation_scopes=frozenset(
+                str(token.claims.get("delegation_scope", "")).split()
+            ),
+            purpose=str(token.claims.get("purpose", "")),
+            resource_type=str(token.claims.get("resource_type", "")),
+            resource_id=str(token.claims.get("resource_id", "")),
+            environment=settings.environment,
+        ),
+        runtime_allowlist=frozenset(TOOL_REGISTRY),
+        globally_enabled=settings.tool_guard_enabled,
+    )
+    with factory.begin() as audit_session:
+        audit_session.add(
+            SecurityDecisionRecord(
+                id=decision.decision_id,
+                tenant_id=tenant_id,
+                actor_id=str(token.claims.get("sub", "unknown")),
+                task_id=task_id,
+                tool_name=decision.tool_id,
+                tool_version=decision.tool_version,
+                effect=decision.effect,
+                reason_codes=list(decision.reason_codes),
+                purpose=decision.purpose,
+                resource_type=decision.resource_type,
+                resource_id=decision.resource_id,
+                policy_version=decision.policy_version,
+                manifest_digest=decision.manifest_digest,
+                context_digest=decision.context_digest,
+                arguments_hash=decision.arguments_hash,
+                data_classification=decision.data_classification.value,
+            )
+        )
+    if decision.effect == "deny":
+        raise PermissionError(
+            "Tool Guard denied the request: " + ", ".join(decision.reason_codes)
+        )
     with factory() as session:
         result = execute_database_tool(
             session=session,

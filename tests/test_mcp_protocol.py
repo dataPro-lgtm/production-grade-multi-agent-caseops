@@ -54,6 +54,7 @@ class McpProtocolTest(unittest.IsolatedAsyncioTestCase):
         token = DelegationTokenIssuer(self.settings).issue(
             principal=principal,
             task_id="run-mcp-001",
+            resource_id="C-102",
         )
         transport = httpx.ASGITransport(app=self.app)
         async with (
@@ -123,6 +124,7 @@ class McpProtocolTest(unittest.IsolatedAsyncioTestCase):
         token = DelegationTokenIssuer(self.settings).issue(
             principal=Principal("tenant-demo", "integration-test"),
             task_id="run-token-001",
+            resource_id="C-102",
         )
         verifier = DelegationTokenVerifier(self.settings)
         wrong_audience = Settings(

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     environment: Literal["development", "test", "production"] = "development"
     service_name: str = "caseops-api"
-    service_version: str = "0.5.0"
+    service_version: str = "0.6.0"
     database_url: str = "sqlite+pysqlite:///./caseops.db"
     api_keys: dict[str, str] = Field(
         default_factory=lambda: {"caseops-local-dev-key": "tenant-demo"}
@@ -27,7 +27,9 @@ class Settings(BaseSettings):
     request_max_timeout_seconds: float = Field(default=60.0, gt=0, le=600)
     readiness_remote_checks: bool = False
     readiness_timeout_seconds: float = Field(default=1.0, gt=0, le=5)
-    expected_database_revision: str = "0004"
+    expected_database_revision: str = "0005"
+    tool_guard_policy_version: str = "caseops.tool-policy.2026-07"
+    tool_guard_enabled: bool = True
     otel_exporter_otlp_traces_endpoint: str | None = None
     otel_batch_export_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     agent_planner: Literal["conformance", "openai"] = "conformance"

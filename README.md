@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 4
+## 当前里程碑：Slice 5
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -43,7 +43,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 7. PostgreSQL 备份包含版本与哈希清单，恢复在隔离数据库验证内容签名和业务不变量；
 8. 一键验收会真实停止 A2A、观察降级、重启服务并完成恢复演练。
 
-模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面或运行保证的正确性。
+第 6 章的 Slice 5 把“声明最小权限”升级为“权限与数据释放都经过可执行判定”：
+
+1. 每个工具都有版本化 Security Manifest，并用 SHA-256 绑定真实 Tool Definition；
+2. MCP 执行前统一经过默认拒绝的 ToolGuard；
+3. 有效 scope 取用户、工作负载和本次委托三者交集；
+4. 短期令牌绑定 tenant、task、audience、purpose、resource 和 workload；
+5. 工具版本、scope、风险或定义漂移会拒绝执行；
+6. 每次允许与拒绝只记录策略、Manifest、上下文和参数摘要，不落原始 Prompt 与业务载荷；
+7. OutputGuard 会最小化邮箱与手机号，并阻断合成 canary secret 和未获准的受限数据；
+8. 11 个红队样例与一条真实恶意协作目标共同验证零越权副作用、零 canary 泄漏。
+
+模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面、运行保证或安全策略的正确性。
 
 ## 一键运行
 
@@ -55,7 +66,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-05
+make acceptance-chapter-06
 ```
 
 如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
@@ -123,6 +134,7 @@ curl --fail-with-body \
 使用相同幂等键再次请求会返回相同 `run_id` 和 `pack_id`，且 `replayed=true`，不会重新检索和构建 Context Pack。
 
 完整的 Trace、SLO、故障降级与恢复验证见 [第 5 章运行手册](docs/chapter-05-runbook.md)。
+安全控制、红队样例与审计查询见 [第 6 章运行手册](docs/chapter-06-runbook.md)。
 
 ## 控制面
 
@@ -141,6 +153,22 @@ MCP Tool Server ── five governed read tools ── PostgreSQL
   │
   ▼
 Evidence Join ── quorum · evidence · conflicts ── Audit + CloudEvents Outbox
+```
+
+工具安全控制面：
+
+```text
+Model / Agent tool intent
+  ▼
+ToolGuard
+  ├─ Tool Manifest + definition digest
+  ├─ user ∩ workload ∩ delegation scopes
+  ├─ purpose + tenant + resource + audience
+  └─ risk + side effect + kill switch
+  ├─ deny ──► no execution + minimal decision audit
+  └─ allow ──► MCP read-only tool ──► PostgreSQL
+
+Structured result ──► OutputGuard ──► release | redact | block
 ```
 
 上下文控制面：
@@ -222,6 +250,8 @@ make security
 - Context Pipeline → PostgreSQL FTS / Graph → Context Pack 端到端验收；
 - API → A2A → MCP 跨服务 W3C Trace 与 deadline 验收；
 - Prometheus SLO 规则、依赖降级和 PostgreSQL 隔离恢复演练。
+- ToolGuard 权限交集、Manifest 漂移、跨资源、purpose、kill switch 与未知工具回归；
+- PII 最小化、canary 外泄阻断和真实间接提示注入隔离验收。
 
 ## 设计文档
 
@@ -231,16 +261,18 @@ make security
 - [ADR-0003：由 Supervisor 持有收敛权](docs/adr/0003-supervisor-owns-convergence.md)
 - [ADR-0004：Context Pack 是受治理的证据产品](docs/adr/0004-context-pack-is-a-governed-evidence-product.md)
 - [ADR-0005：把生产级定义为可执行的运行保证](docs/adr/0005-production-is-an-executable-runtime-guarantee.md)
+- [ADR-0006：有效权限取用户、工作负载与委托权限的交集](docs/adr/0006-authority-is-an-intersection-not-a-model-judgment.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
 - [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
 - [第 4 章运行与验收手册](docs/chapter-04-runbook.md)
 - [第 5 章运行与恢复验收手册](docs/chapter-05-runbook.md)
+- [第 6 章安全与红队验收手册](docs/chapter-06-runbook.md)
 
 ## “生产级”的准确含义
 
 本仓库交付的是可运行、可测试、可部署、可观测、可安全演进的生产导向参考实现。它不会声称替任何企业完成以下工作：
 
-- 真实身份提供方、组织权限和完整 OAuth 2.1 授权服务器接入；
+- 真实身份提供方、组织权限、非对称签名、轮换撤销和完整 OAuth 2.1 授权服务器接入；
 - 指定地区和行业的合规认证；
 - 经过真实业务流量校准的容量规划、多副本拓扑和跨区域灾备指标；
 - 写工具的业务幂等、效果账本和审批闭环；
@@ -259,7 +291,7 @@ make security
 | 第 3 章 | Supervisor、A2A、委托、Join 与 CloudEvents | 全链路、部分成功与冲突测试 |
 | 第 4 章 | Context Pipeline、RAG 2.0、GraphRAG | 来源、新鲜度与检索评测 |
 | 第 5 章 | 部署、遥测、恢复与平台化 | SLO、故障演练和恢复报告 |
-| 第 6 章 | ToolGuard、OIDC/ABAC、隐私与审计 | 红队与安全回归 |
+| 第 6 章 | ToolGuard、权限交集、隐私与安全审计 | 11 项红队、注入隔离与零越权副作用 |
 | 第 7 章 | 分层多 Agent 系统合龙 | C-102 全链路追踪 |
 | 第 8 章 | Golden Dataset 与持续回归 | 分层评测报告 |
 | 第 9 章 | AgentOps、事件诊断与成本治理 | 运营看板与 Runbook |

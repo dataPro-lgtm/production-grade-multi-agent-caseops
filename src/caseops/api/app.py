@@ -98,7 +98,9 @@ def create_app(
             "Slice 3 adds governed hybrid retrieval, graph paths, Context Packs, "
             "claim-citation binding, and Context Trace; Slice 4 adds runtime "
             "deadlines, dependency-aware readiness, OpenTelemetry, SLO rules, "
-            "and verified PostgreSQL recovery."
+            "and verified PostgreSQL recovery; Slice 5 adds deterministic Tool "
+            "Guard policy, privacy release controls, security decision audit, "
+            "and red-team regression."
         ),
         lifespan=lifespan,
     )

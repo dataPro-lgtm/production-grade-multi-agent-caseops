@@ -438,6 +438,36 @@ class ToolExecutionRecord(Base):
     )
 
 
+class SecurityDecisionRecord(Base):
+    __tablename__ = "security_decisions"
+    __table_args__ = (
+        Index("ix_security_decisions_tenant_task", "tenant_id", "task_id"),
+        Index("ix_security_decisions_effect_created", "effect", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    task_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    effect: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason_codes: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    purpose: Mapped[str] = mapped_column(String(80), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    manifest_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    context_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    arguments_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    data_classification: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
 class KnowledgeSourceRecord(Base):
     __tablename__ = "knowledge_sources"
     __table_args__ = (

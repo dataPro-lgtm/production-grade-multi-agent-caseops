@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caseops-reference"
-version = "0.5.0"
+version = "0.6.0"
 description = "Runnable reference system for Production-Grade Multi-Agent Systems"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,7 +47,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.package-data]
-caseops = ["py.typed"]
+caseops = ["py.typed", "security/red_team_cases.json"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers"
