@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 7
+## 当前边界：Slice 8
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径；Slice 6 用类型化 DAG、团队边界、系统级确定性验收与 Runtime Context Graph 合龙这些能力；Slice 7 用版本化 Golden Dataset、分层 Grader、N-run 与成对基线比较控制候选发布。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径；Slice 6 用类型化 DAG、团队边界、系统级确定性验收与 Runtime Context Graph 合龙这些能力；Slice 7 用版本化 Golden Dataset、分层 Grader、N-run 与成对基线比较控制候选发布；Slice 8 用持久化运行评估、跨层因果诊断、资源数量归因和真实 GameDay 闭合 AgentOps。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -174,6 +174,34 @@ Golden Dataset + Quality Contract + v0.7.0 Baseline
 
 这条评测链不另造旁路 Fixture API。它调用与发布候选相同的系统接口、A2A、MCP、数据库和权限控制。当前 N-run 验证确定性 conformance 控制面的语义稳定性，不替代未来真实随机模型的统计评测。
 
+Slice 8 的运行诊断与恢复闭环：
+
+```text
+Terminal System Run
+        │ explicit idempotent assessment
+        ▼
+System Step ──► Delegated Task ──► Security Decision
+        │              │
+        └──── first causal failure ────┐
+                                      ▼
+Context Graph refs + version snapshot + timeline
+                                      │
+                                      ▼
+Incident Bundle + resource-count attribution
+                                      │
+                   ┌──────────────────┴──────────────────┐
+                   ▼                                     ▼
+       readiness / human route                  verified recovery run
+                   └──────────────────┬──────────────────┘
+                                      ▼
+                         baseline · incident · recovery
+                           versioned GameDay evidence
+```
+
+顶层 `system_steps` 全部完成，不代表下游没有失败。A2A 中断时，协作服务会把三个不可达专业节点收敛为失败的委托任务，系统验收再安全地产生 `SYSTEM_REJECTED`。因此 Slice 8 的首故障判断会继续下钻到 `delegated_tasks`，而不是停在顶层结果码。
+
+成本侧只合计账本中真实存在的步骤尝试、上下文运行、委托尝试和安全决策。不同单位不会被强行相加；没有模型 token 和版本化供应商价格表时，报告明确不给货币金额。
+
 ## 执行与验证路径
 
 | 路径 | 用途 | 是否调用外部模型 |
@@ -187,6 +215,7 @@ Golden Dataset + Quality Contract + v0.7.0 Baseline
 | `security red-team + live collaboration` | Docker 默认安全验收，验证权限交集、数据释放和注入隔离 | 否 |
 | `system DAG + context + A2A/MCP + acceptance` | Docker 默认系统验收，验证分层合龙与 Runtime Context Graph | 否 |
 | `Golden Dataset + live HTTP N-run + paired gates` | Docker 默认发布评测，验证六层非回归与租户隔离 | 否 |
+| `A2A fault + operational assessment + recovery run` | Docker GameDay，验证因果诊断、资源归因与恢复 | 否 |
 
 `ConformancePlanner` 是确定性的协议一致性驱动器，不伪装成 Agent。真实模型适配器使用 Responses API，但无论 planner 来自哪里，都必须经过同一套契约、授权、预算、MCP、账本和检查点。
 

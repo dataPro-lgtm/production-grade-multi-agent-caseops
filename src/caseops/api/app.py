@@ -22,6 +22,7 @@ from caseops.errors import (
     IdempotencyConflict,
     PolicyNotFound,
     SystemRunNotFound,
+    SystemRunNotTerminal,
 )
 from caseops.logging_config import configure_logging
 from caseops.platform.runtime_envelope import (
@@ -105,7 +106,9 @@ def create_app(
             "hierarchical team convergence, deterministic cross-team acceptance, "
             "and a queryable runtime Context Graph; Slice 7 adds a versioned "
             "Golden Dataset, layered deterministic graders, N-run semantic "
-            "consistency, and paired release gates."
+            "consistency, and paired release gates; Slice 8 adds durable "
+            "operational assessments, causal incident bundles, honest "
+            "resource-count attribution, and a verified A2A recovery GameDay."
         ),
         lifespan=lifespan,
     )
@@ -198,6 +201,10 @@ def create_app(
             CaseNotFound: (status.HTTP_404_NOT_FOUND, "Case not found"),
             PolicyNotFound: (status.HTTP_409_CONFLICT, "Policy unavailable"),
             SystemRunNotFound: (status.HTTP_404_NOT_FOUND, "System run not found"),
+            SystemRunNotTerminal: (
+                status.HTTP_409_CONFLICT,
+                "System run not terminal",
+            ),
             IdempotencyConflict: (status.HTTP_409_CONFLICT, "Idempotency conflict"),
             ActionNotAllowed: (
                 status.HTTP_422_UNPROCESSABLE_CONTENT,

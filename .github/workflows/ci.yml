@@ -89,17 +89,20 @@ jobs:
       - name: Build runtime image
         run: docker build --tag caseops:${{ github.sha }} .
 
-      - name: Run live multi-agent evaluation gate
+      - name: Run live evaluation and AgentOps GameDay gates
         run: |
           docker compose up --build --wait --wait-timeout 120 -d
           PATH="$PWD/.venv/bin:$PATH" make acceptance-chapter-08
+          PATH="$PWD/.venv/bin:$PATH" make acceptance-chapter-09
 
-      - name: Upload evaluation evidence
+      - name: Upload evaluation and operations evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: caseops-evaluation-${{ github.sha }}
-          path: artifacts/evaluation/chapter-08-report.json
+          name: caseops-release-evidence-${{ github.sha }}
+          path: |
+            artifacts/evaluation/chapter-08-report.json
+            artifacts/operations/chapter-09-gameday.json
           if-no-files-found: error
           retention-days: 14
 

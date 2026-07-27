@@ -12,6 +12,7 @@ from caseops.agent.service import AgentRunService
 from caseops.collaboration.service import CollaborationService
 from caseops.context.contracts import ContextInvestigationRequest
 from caseops.context.service import ContextInvestigationService
+from caseops.operations.service import OperationsService
 from caseops.orchestration.service import SystemRunService
 from caseops.service import InvestigationService, Principal
 
@@ -26,6 +27,7 @@ from .schemas import (
     HealthResponse,
     InvestigationCreate,
     InvestigationResponse,
+    OperationalAssessmentResponse,
     ProblemDetails,
     SystemContextGraphResponse,
     SystemRunCreate,
@@ -361,3 +363,45 @@ def get_system_context_graph(
         principal=principal,
         system_run_id=system_run_id,
     )
+
+
+@router.post(
+    "/v1/system-runs/{system_run_id}/operational-assessments",
+    response_model=OperationalAssessmentResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["operations"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+        409: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+    },
+)
+def create_operational_assessment(
+    system_run_id: str,
+    request: Request,
+    response: Response,
+    principal: Annotated[Principal, Depends(authenticate)],
+    session: Annotated[Session, Depends(get_session)],
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=8,
+            max_length=120,
+            pattern=r"^[A-Za-z0-9._:-]+$",
+        ),
+    ],
+) -> OperationalAssessmentResponse:
+    execution = OperationsService(
+        session=session,
+        settings=request.app.state.settings,
+    ).assess(
+        principal=principal,
+        system_run_id=system_run_id,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
+    if execution.replayed:
+        response.status_code = status.HTTP_200_OK
+    return OperationalAssessmentResponse.model_validate(asdict(execution))

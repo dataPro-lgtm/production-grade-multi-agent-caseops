@@ -15,8 +15,8 @@ import sys
 
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
 assert payload["status"] == "ok", payload
-assert "revision 0006" in payload["checks"][0]["detail"], payload
-print("hierarchical orchestration schema accepted: revision 0006")
+assert "revision 0007" in payload["checks"][0]["detail"], payload
+print("hierarchical orchestration schema accepted: revision 0007")
 PY
 
 curl --fail --silent --show-error \

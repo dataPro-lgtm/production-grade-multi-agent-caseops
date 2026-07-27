@@ -786,3 +786,80 @@ class RuntimeContextEdgeRecord(Base):
         default=utc_now,
         nullable=False,
     )
+
+
+class OperationalAssessmentRecord(Base):
+    __tablename__ = "operational_assessments"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_operational_assessments_tenant_idempotency",
+        ),
+        Index(
+            "ix_operational_assessments_tenant_run",
+            "tenant_id",
+            "system_run_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    system_run_id: Mapped[str] = mapped_column(
+        ForeignKey("system_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False)
+    report: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    report_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class OperationalCostEventRecord(Base):
+    __tablename__ = "operational_cost_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_id",
+            "dimension",
+            "resource_type",
+            name="uq_operational_cost_events_assessment_dimension_resource",
+        ),
+        Index(
+            "ix_operational_cost_events_tenant_run",
+            "tenant_id",
+            "system_run_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    system_run_id: Mapped[str] = mapped_column(
+        ForeignKey("system_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    assessment_id: Mapped[str] = mapped_column(
+        ForeignKey("operational_assessments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    dimension: Mapped[str] = mapped_column(String(40), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+    unit: Mapped[str] = mapped_column(String(40), nullable=False)
+    attribution: Mapped[str] = mapped_column(String(40), nullable=False)
+    monetary_cost_microunits: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )

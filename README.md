@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 7
+## 当前里程碑：Slice 8
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -79,6 +79,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 9. CI 留存完整 JSON 报告，wall-clock 仅诊断，目标环境 SLO 由生产遥测判定；
 10. 模型 Judge 保持辅助地位，未经人工校准不能覆盖确定性安全门禁。
 
+第 9 章的 Slice 8 把“有监控”升级为“事故可以因果重建、成本可以诚实归因、恢复可以实际验证”：
+
+1. 运行评估是显式、幂等、租户隔离的写操作，只接受已经进入终态的系统运行；
+2. `operational_assessments` 保存影响、时间线、首个失败点、证据清单、成本归因、处置建议与版本快照；
+3. 诊断会穿透顶层系统步骤，继续检查委托任务，避免把 `SYSTEM_REJECTED` 当作根因；
+4. Incident Bundle 只保存运行、步骤、子任务和 Context Graph 的引用与摘要，不复制 Prompt、工具参数或业务载荷；
+5. `operational_cost_events` 按成功目标归因步骤尝试、上下文运行、委托尝试和安全决策；
+6. 确定性模式没有模型调用和供应商价目表，因此货币成本明确为 `null`，不伪造精确金额；
+7. GameDay 真实停止 A2A，验证三个委托任务受控失败、外部副作用为零、首故障位于协作层；
+8. A2A 恢复后重新执行系统运行，必须再次形成健康评估；
+9. 基线、事故与恢复三份评估合并为版本化 JSON 证据，并由 CI 留存。
+
 模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面、运行保证或安全策略的正确性。
 
 ## 一键运行
@@ -91,7 +103,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-08
+make acceptance-chapter-09
 ```
 
 如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
@@ -162,6 +174,7 @@ curl --fail-with-body \
 安全控制、红队样例与审计查询见 [第 6 章运行手册](docs/chapter-06-runbook.md)。
 分层合龙、系统验收与 Runtime Context Graph 见 [第 7 章运行手册](docs/chapter-07-runbook.md)。
 Golden Dataset、分层评测与持续回归见 [第 8 章运行手册](docs/chapter-08-runbook.md)。
+事故证据包、成本归因与 A2A 恢复演练见 [第 9 章运行手册](docs/chapter-09-runbook.md)。
 
 手工发起系统级合龙运行：
 
@@ -300,6 +313,8 @@ make security
 - ToolGuard 权限交集、Manifest 漂移、跨资源、purpose、kill switch 与未知工具回归；
 - PII 最小化、canary 外泄阻断和真实间接提示注入隔离验收。
 - 系统 DAG、父子运行、跨团队一致性验收、来源图完整性和系统级幂等重放。
+- Golden Dataset、N-run、六层成对比较与发布 Artifact。
+- A2A 故障注入、跨层首故障定位、资源归因和恢复后 Goal 复验。
 
 ## 设计文档
 
@@ -311,12 +326,16 @@ make security
 - [ADR-0005：把生产级定义为可执行的运行保证](docs/adr/0005-production-is-an-executable-runtime-guarantee.md)
 - [ADR-0006：有效权限取用户、工作负载与委托权限的交集](docs/adr/0006-authority-is-an-intersection-not-a-model-judgment.md)
 - [ADR-0007：系统合龙使用确定性验收与运行时来源图](docs/adr/0007-system-convergence-needs-deterministic-acceptance.md)
+- [ADR-0008：发布需要系统级评测门禁](docs/adr/0008-release-needs-system-level-evaluation-gates.md)
+- [ADR-0009：运行结论必须来自跨层因果证据与诚实成本归因](docs/adr/0009-operations-needs-causal-evidence-and-honest-cost-attribution.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
 - [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
 - [第 4 章运行与验收手册](docs/chapter-04-runbook.md)
 - [第 5 章运行与恢复验收手册](docs/chapter-05-runbook.md)
 - [第 6 章安全与红队验收手册](docs/chapter-06-runbook.md)
 - [第 7 章分层合龙与 Context Graph 验收手册](docs/chapter-07-runbook.md)
+- [第 8 章系统级评测与发布门禁手册](docs/chapter-08-runbook.md)
+- [第 9 章 AgentOps 事故诊断与恢复手册](docs/chapter-09-runbook.md)
 
 ## “生产级”的准确含义
 

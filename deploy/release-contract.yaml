@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.8.0
+release: v0.9.0
 services:
   api:
     image: caseops-api
@@ -18,7 +18,7 @@ services:
 state:
   transactional_source_of_truth:
     owner: postgres
-    migration_head: "0006"
+    migration_head: "0007"
     backup_format: postgresql-custom
     restore_verification: scripts/restore-drill-chapter-05.sh
 slo:
@@ -59,3 +59,12 @@ evaluation:
     - efficiency
   report: artifacts/evaluation/chapter-08-report.json
   acceptance: scripts/acceptance-chapter-08.sh
+operations:
+  assessment_schema: caseops.operational-assessment.v1
+  incident_evidence: references-and-digests-no-raw-prompts
+  causal_scope: system-run-through-delegated-task
+  cost_attribution: durable-resource-counts
+  monetary_pricing: not-configured
+  gameday_scenario: a2a-dependency-interruption-and-recovery
+  report: artifacts/operations/chapter-09-gameday.json
+  acceptance: scripts/acceptance-chapter-09.sh

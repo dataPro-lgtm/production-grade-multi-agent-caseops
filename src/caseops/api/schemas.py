@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from caseops.collaboration.contracts import CollaborationResult, JoinPolicy
 from caseops.context.contracts import ContextInvestigationResult
+from caseops.operations.contracts import OperationalAssessment
 from caseops.orchestration.contracts import (
     RuntimeContextGraph,
     SystemRunRequest,
@@ -213,6 +214,15 @@ class SystemRunResponse(BaseModel):
 
 SystemRunCreate = SystemRunRequest
 SystemContextGraphResponse = RuntimeContextGraph
+
+
+class OperationalAssessmentResponse(BaseModel):
+    assessment_id: str
+    idempotency_key: str
+    replayed: bool
+    report_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    created_at: datetime
+    report: OperationalAssessment
 
 
 class ProblemDetails(BaseModel):

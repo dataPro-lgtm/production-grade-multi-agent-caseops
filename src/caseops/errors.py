@@ -78,3 +78,12 @@ class SystemRunNotFound(CaseOpsError):
             message="系统运行不存在或当前租户无权访问。",
             details={"system_run_id": system_run_id},
         )
+
+
+class SystemRunNotTerminal(CaseOpsError):
+    def __init__(self, system_run_id: str, status: str) -> None:
+        super().__init__(
+            code="SYSTEM_RUN_NOT_TERMINAL",
+            message="只有进入终态的系统运行才能生成运行评估。",
+            details={"system_run_id": system_run_id, "status": status},
+        )

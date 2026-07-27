@@ -15,3 +15,4 @@ caseops.db
 coverage.xml
 htmlcov/
 artifacts/evaluation/*.json
+artifacts/operations/*.json
