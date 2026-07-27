@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing immutable vX.Y.Z tag to publish or recover
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -25,6 +31,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - uses: actions/setup-python@v7
         with:
@@ -39,18 +46,25 @@ jobs:
 
       - name: Verify immutable release identity
         id: version
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
           python - <<'PY'
           import caseops
           import os
 
           expected = f"v{caseops.__version__}"
-          actual = os.environ["GITHUB_REF_NAME"]
+          actual = os.environ["RELEASE_TAG"]
           assert actual == expected, (actual, expected)
           print(f"release identity accepted: {actual}")
           PY
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$(git rev-parse HEAD)"
           test "$(git status --porcelain)" = ""
-          echo "number=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=${RELEASE_TAG}"
+            echo "number=${RELEASE_TAG#v}"
+            echo "sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run code, security, and protocol gates
         run: |
@@ -85,7 +99,7 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
+            type=raw,value=${{ steps.version.outputs.number }}
             type=raw,value=latest
 
       - name: Build and push immutable release image
@@ -98,7 +112,7 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
             VERSION=${{ steps.version.outputs.number }}
-            VCS_REF=${{ github.sha }}
+            VCS_REF=${{ steps.version.outputs.sha }}
           provenance: mode=max
           sbom: true
 
@@ -106,21 +120,21 @@ jobs:
         uses: anchore/sbom-action@v0
         with:
           image: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
-          output-file: ${{ runner.temp }}/caseops-${{ github.ref_name }}.spdx.json
-          artifact-name: caseops-${{ github.ref_name }}.spdx.json
+          output-file: ${{ runner.temp }}/caseops-${{ steps.version.outputs.tag }}.spdx.json
+          artifact-name: caseops-${{ steps.version.outputs.tag }}.spdx.json
           format: spdx-json
-          syft-version: 1.44.0
+          syft-version: v1.44.0
           upload-artifact: false
           upload-release-assets: false
 
       - name: Rebuild release evidence with the registry digest
         run: |
           python -m caseops.release_evidence \
-            --source-commit "${{ github.sha }}" \
-            --source-ref "${{ github.ref_name }}" \
+            --source-commit "${{ steps.version.outputs.sha }}" \
+            --source-ref "${{ steps.version.outputs.tag }}" \
             --image-name "${{ env.IMAGE_NAME }}" \
             --image-digest "${{ steps.image.outputs.digest }}" \
-            --sbom "${RUNNER_TEMP}/caseops-${GITHUB_REF_NAME}.spdx.json" \
+            --sbom "${RUNNER_TEMP}/caseops-${{ steps.version.outputs.tag }}.spdx.json" \
             --source-date-epoch "$(git show -s --format=%ct HEAD)"
           tar \
             --sort=name \
@@ -128,7 +142,7 @@ jobs:
             --owner=0 \
             --group=0 \
             --numeric-owner \
-            -czf "caseops-${GITHUB_REF_NAME}-release.tar.gz" \
+            -czf "caseops-${{ steps.version.outputs.tag }}-release.tar.gz" \
             -C artifacts/release .
 
       - name: Attest image build provenance
@@ -143,30 +157,30 @@ jobs:
         with:
           subject-name: ${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.image.outputs.digest }}
-          sbom-path: artifacts/release/caseops-${{ github.ref_name }}.spdx.json
+          sbom-path: artifacts/release/caseops-${{ steps.version.outputs.tag }}.spdx.json
           push-to-registry: true
 
       - name: Attest downloadable release bundle
         uses: actions/attest@v4
         with:
-          subject-path: caseops-${{ github.ref_name }}-release.tar.gz
+          subject-path: caseops-${{ steps.version.outputs.tag }}-release.tar.gz
 
       - name: Verify published image attestations
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh attestation verify \
-            "oci://${IMAGE_NAME}:${GITHUB_REF_NAME}" \
+            "oci://${IMAGE_NAME}:${{ steps.version.outputs.number }}" \
             --repo "$GITHUB_REPOSITORY"
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "caseops-${GITHUB_REF_NAME}-release.tar.gz" \
-            "artifacts/release/caseops-${GITHUB_REF_NAME}.spdx.json" \
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "caseops-${{ steps.version.outputs.tag }}-release.tar.gz" \
+            "artifacts/release/caseops-${{ steps.version.outputs.tag }}.spdx.json" \
             artifacts/release/SHA256SUMS \
             --verify-tag \
             --generate-notes \
-            --title "CaseOps ${GITHUB_REF_NAME}"
+            --title "CaseOps ${{ steps.version.outputs.tag }}"
