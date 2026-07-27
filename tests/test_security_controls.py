@@ -20,6 +20,26 @@ class SecurityControlsTest(unittest.TestCase):
         self.assertEqual(report["unauthorized_side_effects"], 0)
         self.assertEqual(report["secret_leakage_count"], 0)
 
+    def test_red_team_report_counts_a_secret_release_as_leakage(self) -> None:
+        report = run_dataset(
+            {
+                "schema_version": "caseops.red-team-dataset.test",
+                "cases": [
+                    {
+                        "case_id": "RT-REPORT-LEAK-001",
+                        "kind": "privacy",
+                        "classification": "internal",
+                        "text": "plain text that the output policy releases",
+                        "expected_effect": "blocked",
+                        "expected_reason": "SECRET_CANARY_DETECTED",
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(report["failed"], 1)
+        self.assertEqual(report["secret_leakage_count"], 1)
+
     def test_output_guard_redacts_pii_without_returning_original(self) -> None:
         decision = OutputGuard().release(
             "联系 claim.owner@example.test 或 13800138000。",

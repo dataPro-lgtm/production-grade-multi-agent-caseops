@@ -17,12 +17,13 @@ ALL_SCOPES = frozenset(
 )
 
 
-def run_dataset() -> dict[str, Any]:
-    dataset = json.loads(
-        files("caseops.security")
-        .joinpath("red_team_cases.json")
-        .read_text(encoding="utf-8")
-    )
+def run_dataset(dataset: dict[str, Any] | None = None) -> dict[str, Any]:
+    if dataset is None:
+        dataset = json.loads(
+            files("caseops.security")
+            .joinpath("red_team_cases.json")
+            .read_text(encoding="utf-8")
+        )
     results: list[dict[str, Any]] = []
     unauthorized_side_effects = 0
     secret_leakage_count = 0
@@ -77,8 +78,8 @@ def run_dataset() -> dict[str, Any]:
         ):
             unauthorized_side_effects += 1
         if (
-            case["kind"] == "output"
-            and case["expected_effect"] == "block"
+            case["kind"] == "privacy"
+            and case["expected_effect"] == "blocked"
             and effect == "released"
         ):
             secret_leakage_count += 1

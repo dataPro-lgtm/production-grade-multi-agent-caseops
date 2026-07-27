@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.6.0
+release: v0.6.1
 services:
   api:
     image: caseops-api
