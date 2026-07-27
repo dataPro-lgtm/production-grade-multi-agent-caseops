@@ -7,6 +7,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from caseops.collaboration.contracts import CollaborationResult, JoinPolicy
 from caseops.context.contracts import ContextInvestigationResult
+from caseops.orchestration.contracts import (
+    RuntimeContextGraph,
+    SystemRunRequest,
+    SystemRunResult,
+)
 
 
 class InvestigationCreate(BaseModel):
@@ -168,6 +173,46 @@ class ContextRunResponse(BaseModel):
     result: ContextInvestigationResult
     created_at: datetime
     completed_at: datetime
+
+
+class SystemStepResponse(BaseModel):
+    step_key: Literal[
+        "context-evidence",
+        "specialist-collaboration",
+        "system-acceptance",
+    ]
+    owner: str
+    status: Literal["planned", "running", "succeeded", "failed"]
+    attempt_count: int
+    depends_on: tuple[str, ...]
+    result_ref: str | None
+    result_digest: str | None
+    error: dict[str, object] | None
+
+
+class SystemRunResponse(BaseModel):
+    system_run_id: str
+    idempotency_key: str
+    status: Literal[
+        "created",
+        "running",
+        "consolidating",
+        "completed",
+        "needs_human",
+        "failed",
+    ]
+    replayed: bool
+    resumed: bool
+    result: SystemRunResult
+    steps: tuple[SystemStepResponse, ...]
+    child_runs: dict[str, str]
+    context_graph_uri: str
+    created_at: datetime
+    completed_at: datetime | None
+
+
+SystemRunCreate = SystemRunRequest
+SystemContextGraphResponse = RuntimeContextGraph
 
 
 class ProblemDetails(BaseModel):

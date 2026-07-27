@@ -640,3 +640,149 @@ class ContextRunRecord(Base):
         DateTime(timezone=True),
         nullable=False,
     )
+
+
+class SystemRunRecord(Base):
+    __tablename__ = "system_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "idempotency_key",
+            name="uq_system_runs_tenant_idempotency",
+        ),
+        Index("ix_system_runs_tenant_case", "tenant_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    case_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    plan: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
+    context_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("context_runs.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    collaboration_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("collaboration_runs.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    final_result: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class SystemStepRecord(Base):
+    __tablename__ = "system_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "system_run_id",
+            "step_key",
+            name="uq_system_steps_run_key",
+        ),
+        Index("ix_system_steps_tenant_run", "tenant_id", "system_run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    system_run_id: Mapped[str] = mapped_column(
+        ForeignKey("system_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    step_key: Mapped[str] = mapped_column(String(80), nullable=False)
+    owner: Mapped[str] = mapped_column(String(120), nullable=False)
+    goal: Mapped[str] = mapped_column(Text, nullable=False)
+    depends_on: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    acceptance_criteria: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    result_ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    result_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+
+class RuntimeContextNodeRecord(Base):
+    __tablename__ = "runtime_context_nodes"
+    __table_args__ = (
+        UniqueConstraint(
+            "system_run_id",
+            "node_key",
+            name="uq_runtime_context_nodes_run_key",
+        ),
+        Index("ix_runtime_context_nodes_tenant_run", "tenant_id", "system_run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    system_run_id: Mapped[str] = mapped_column(
+        ForeignKey("system_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    node_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    node_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    label: Mapped[str] = mapped_column(String(300), nullable=False)
+    owner: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    ref: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    payload_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    classification: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class RuntimeContextEdgeRecord(Base):
+    __tablename__ = "runtime_context_edges"
+    __table_args__ = (
+        UniqueConstraint(
+            "system_run_id",
+            "edge_key",
+            name="uq_runtime_context_edges_run_key",
+        ),
+        Index("ix_runtime_context_edges_tenant_run", "tenant_id", "system_run_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    system_run_id: Mapped[str] = mapped_column(
+        ForeignKey("system_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    tenant_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    edge_key: Mapped[str] = mapped_column(String(240), nullable=False)
+    from_node_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    to_node_key: Mapped[str] = mapped_column(String(180), nullable=False)
+    relation_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )

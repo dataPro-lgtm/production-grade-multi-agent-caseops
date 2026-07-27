@@ -16,6 +16,7 @@ class ApiMetrics:
     agent_steps: Histogram
     collaboration_runs: Counter
     context_runs: Counter
+    system_runs: Counter
     inflight: Gauge
     deadline_rejections: Counter
     dependency_ready: Gauge
@@ -66,6 +67,12 @@ class ApiMetrics:
                 "caseops_context_runs_total",
                 "Context investigations by verdict and replay state",
                 ("verdict", "replayed"),
+                registry=registry,
+            ),
+            system_runs=Counter(
+                "caseops_system_runs_total",
+                "Hierarchical system runs by terminal status and replay state",
+                ("status", "replayed", "resumed"),
                 registry=registry,
             ),
             inflight=Gauge(

@@ -1,5 +1,5 @@
 schema_version: caseops.release-contract.v1
-release: v0.6.1
+release: v0.7.0
 services:
   api:
     image: caseops-api
@@ -18,7 +18,7 @@ services:
 state:
   transactional_source_of_truth:
     owner: postgres
-    migration_head: "0005"
+    migration_head: "0006"
     backup_format: postgresql-custom
     restore_verification: scripts/restore-drill-chapter-05.sh
 slo:
@@ -40,3 +40,8 @@ security:
   resource_binding: tenant and case
   audit: hashed arguments and context, no raw tool payloads
   red_team_acceptance: scripts/acceptance-chapter-06.sh
+orchestration:
+  plan: validated-acyclic-dag
+  convergence: deterministic-cross-team-acceptance
+  runtime_context_graph: metadata-and-digests-no-raw-prompts
+  acceptance: scripts/acceptance-chapter-07.sh

@@ -12,6 +12,7 @@ from caseops.agent.service import AgentRunService
 from caseops.collaboration.service import CollaborationService
 from caseops.context.contracts import ContextInvestigationRequest
 from caseops.context.service import ContextInvestigationService
+from caseops.orchestration.service import SystemRunService
 from caseops.service import InvestigationService, Principal
 
 from .auth import authenticate
@@ -26,6 +27,9 @@ from .schemas import (
     InvestigationCreate,
     InvestigationResponse,
     ProblemDetails,
+    SystemContextGraphResponse,
+    SystemRunCreate,
+    SystemRunResponse,
 )
 
 router = APIRouter()
@@ -286,3 +290,74 @@ def create_context_investigation(
         replayed=str(execution.replayed).lower(),
     ).inc()
     return ContextRunResponse.model_validate(asdict(execution))
+
+
+@router.post(
+    "/v1/cases/{case_id}/system-runs",
+    response_model=SystemRunResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["system-runs"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+        409: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+    },
+)
+async def create_system_run(
+    case_id: str,
+    body: SystemRunCreate,
+    request: Request,
+    response: Response,
+    principal: Annotated[Principal, Depends(authenticate)],
+    idempotency_key: Annotated[
+        str,
+        Header(
+            alias="Idempotency-Key",
+            min_length=8,
+            max_length=120,
+            pattern=r"^[A-Za-z0-9._:-]+$",
+        ),
+    ],
+) -> SystemRunResponse:
+    execution = await SystemRunService(
+        session_factory=request.app.state.session_factory,
+        settings=request.app.state.settings,
+    ).execute(
+        principal=principal,
+        case_id=case_id,
+        request=body,
+        idempotency_key=idempotency_key,
+        request_id=request.state.request_id,
+    )
+    if execution.replayed or execution.resumed:
+        response.status_code = status.HTTP_200_OK
+    request.app.state.metrics.system_runs.labels(
+        status=execution.status,
+        replayed=str(execution.replayed).lower(),
+        resumed=str(execution.resumed).lower(),
+    ).inc()
+    return SystemRunResponse.model_validate(asdict(execution))
+
+
+@router.get(
+    "/v1/system-runs/{system_run_id}/context-graph",
+    response_model=SystemContextGraphResponse,
+    tags=["system-runs"],
+    responses={
+        401: {"model": ProblemDetails},
+        404: {"model": ProblemDetails},
+    },
+)
+def get_system_context_graph(
+    system_run_id: str,
+    request: Request,
+    principal: Annotated[Principal, Depends(authenticate)],
+) -> SystemContextGraphResponse:
+    return SystemRunService(
+        session_factory=request.app.state.session_factory,
+        settings=request.app.state.settings,
+    ).get_context_graph(
+        principal=principal,
+        system_run_id=system_run_id,
+    )

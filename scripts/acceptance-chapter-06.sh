@@ -22,8 +22,8 @@ import sys
 
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
 assert payload["status"] == "ok", payload
-assert "revision 0005" in payload["checks"][0]["detail"], payload
-print("security schema gate accepted: revision 0005")
+assert "revision 0006" in payload["checks"][0]["detail"], payload
+print("security schema gate accepted: revision 0006")
 PY
 
 docker compose exec -T api \

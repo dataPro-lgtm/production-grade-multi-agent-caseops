@@ -47,6 +47,14 @@ with snapshot(entity, value) as (
   union all
   select 'security_decision', id || ':' || context_digest from security_decisions
   union all
+  select 'system_run', id || ':' || request_hash from system_runs
+  union all
+  select 'system_step', id || ':' || step_key || ':' || status from system_steps
+  union all
+  select 'runtime_context_node', id || ':' || node_key || ':' || payload_digest from runtime_context_nodes
+  union all
+  select 'runtime_context_edge', id || ':' || edge_key from runtime_context_edges
+  union all
   select 'outbox', id || ':' || topic || ':' || aggregate_id from outbox_events
 )
 select md5(coalesce(string_agg(entity || ':' || value, E'\n' order by entity, value), ''))

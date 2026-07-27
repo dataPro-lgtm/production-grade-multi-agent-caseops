@@ -1,8 +1,8 @@
 # CaseOps 架构说明
 
-## 当前边界：Slice 5
+## 当前边界：Slice 6
 
-CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
+CaseOps 仍以第 1 章的确定性业务内核为事实来源。Slice 1 建立受控 Agent 运行时和 MCP 工具服务；Slice 2 增加 Supervisor、三个专业 Agent、A2A 1.0、Evidence Join 与 CloudEvents Outbox；Slice 3 增加来源治理、混合检索、受限关系路径、Context Pack 与 Context Trace；Slice 4 把跨服务 deadline、健康语义、遥测和恢复验证收进同一套运行契约；Slice 5 把工具授权、隐私释放、最小安全审计和确定性红队基线加入真实执行路径；Slice 6 用类型化 DAG、团队边界、系统级确定性验收与 Runtime Context Graph 合龙这些能力。任何 Agent 都没有租户身份、数据库凭据或最终处置权，任何检索候选也不会绕过上下文门禁直接进入模型。
 
 ```text
 HTTP API
@@ -126,6 +126,30 @@ Structured output ──► OutputGuard ──► release | redact | block
 Red-team dataset ───► same controls ─► versioned acceptance report
 ```
 
+Slice 6 的系统合龙：
+
+```text
+Goal + Principal + as_of
+          │
+          ▼
+Central Supervisor ── validated DAG ── system_runs / system_steps
+   │                                      │
+   ├── Context Team ── Context Pack ──────┤
+   │                                      │
+   └── Collaboration Team                │
+          └─ A2A ── 3 Specialists        │
+                    └─ MCP ── PostgreSQL  │
+                                         ▼
+                         Deterministic System Acceptance
+                         policy · document · risk
+                         evidence · side effect
+                                         │
+                                         ▼
+                     Runtime Context Graph + Audit + Outbox
+```
+
+这不是把所有状态塞进一个“大 Supervisor”。Central Supervisor 只拥有计划、依赖和系统终态；Context Team 拥有 Context Pack，Collaboration Team 拥有委托与 Join，专业节点只拥有自己的不可变 Artifact。系统级验收消费引用和结构化主张，不回写团队内部状态。
+
 ## 执行与验证路径
 
 | 路径 | 用途 | 是否调用外部模型 |
@@ -137,6 +161,7 @@ Red-team dataset ───► same controls ─► versioned acceptance report
 | `collaboration a2a + mcp` | Docker 默认协作验收，验证完整协议链 | 否 |
 | `context structured + full_text + graph` | Docker 默认上下文验收，验证来源、时态、权限、证据与关系路径 | 否 |
 | `security red-team + live collaboration` | Docker 默认安全验收，验证权限交集、数据释放和注入隔离 | 否 |
+| `system DAG + context + A2A/MCP + acceptance` | Docker 默认系统验收，验证分层合龙与 Runtime Context Graph | 否 |
 
 `ConformancePlanner` 是确定性的协议一致性驱动器，不伪装成 Agent。真实模型适配器使用 Responses API，但无论 planner 来自哪里，都必须经过同一套契约、授权、预算、MCP、账本和检查点。
 
@@ -206,6 +231,10 @@ Supervisor 是 `collaboration_runs`、`delegated_tasks` 与最终 Join 的唯一
 
 Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前规则、历史规则、来源材料、别名规则、风险信号、风险规则和外部邮件都可能被检索到，但只有满足当前主体 scope、调查用途、`as_of`、完整性和信任边界的对象才能进入 Context Pack。`2025.4` 历史规则和带越权指令的外部邮件被明确拒绝并保留 Trace，最终三条 Claim 分别绑定规则、材料和风险证据。
 
+Slice 6 不再让读者手工对照 Context 与 Collaboration 两份结果。系统级 Reducer 会核对：Context 的 `2026.1` 是否出现在专业节点的案件绑定规则证据中；Context 的事故证明已满足是否与 Document Agent 的 `complete` 一致；Context 的 `required=true` 是否与 Risk Agent 的 `manual_review_required` 一致。任何一项不一致都会得到 `SYSTEM_REJECTED`，而不是让语言模型写一个看似顺滑的总结。
+
+Runtime Context Graph 是本次运行的来源索引，不是企业知识图谱，也不替代 Trace。知识图谱表达稳定业务关系；Trace 表达一次调用的时间因果；Runtime Context Graph 表达“哪个目标经哪个计划、步骤和团队，使用哪些证据形成哪些主张，并由什么门禁验收”。节点只保存引用、分类和 SHA-256 摘要，原始内容仍由所属系统管理。
+
 ## 已实现的生产属性
 
 | 属性 | 当前实现 |
@@ -236,6 +265,9 @@ Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前
 | SLI/SLO | 低基数请求指标、记录规则、错误预算快速燃烧与依赖告警 |
 | 数据恢复 | 带哈希清单的 custom dump、隔离恢复、内容签名和业务不变量 |
 | 质量门禁 | Ruff、Mypy strict、pytest、分支覆盖率、Bandit、pip-audit、容器验收 |
+| 分层合龙 | 类型化无环 DAG、Central/Team/Worker 状态所有权与父子运行引用 |
+| 系统验收 | 规则、材料、风险、证据与副作用 7 项确定性检查 |
+| Runtime Context Graph | Goal 到 Result 的来源索引；Claim 必须存在 `SUPPORTED_BY` 边 |
 
 ## 尚未声称完成
 
@@ -246,5 +278,7 @@ Slice 3 进一步解决“Agent 究竟看到了什么”。案件快照、当前
 - Slice 4 已提供本地 SLI/SLO 规则和隔离恢复证据，但没有真实生产流量容量报告、多副本会话池、PITR 或跨区域灾备指标；
 - 当前未启用 vector channel；需先交付 embedding 版本、真实领域语料、ACL 过滤策略和可复现检索评测。
 - OutputGuard 已交付确定性组件和安全回归，但当前没有邮件、Webhook 或文件导出连接器；新增任何外发边界时必须接入释放策略与效果审计。
+- 当前系统步骤在一个 API 工作进程内按可运行集合顺序调度；跨进程队列、租约、心跳和抢占恢复尚未实现。
+- MCP Tasks 在 2025-11-25 规范中仍是实验能力；当前五个工具是有界、同步、只读调用，因此没有为了“看起来异步”而启用。长时工具出现后再按能力协商引入。
 
 这些限制是显式演进项，不用 Prompt 或文档承诺替代代码证据。

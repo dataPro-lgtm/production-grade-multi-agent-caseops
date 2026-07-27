@@ -69,3 +69,12 @@ class IdempotencyConflict(CaseOpsError):
             message="同一幂等键已用于不同的请求。",
             details={"idempotency_key": idempotency_key},
         )
+
+
+class SystemRunNotFound(CaseOpsError):
+    def __init__(self, system_run_id: str) -> None:
+        super().__init__(
+            code="SYSTEM_RUN_NOT_FOUND",
+            message="系统运行不存在或当前租户无权访问。",
+            details={"system_run_id": system_run_id},
+        )

@@ -30,7 +30,7 @@ startup = json.loads((root / "startup.json").read_text())
 ready = json.loads((root / "ready.json").read_text())
 assert startup["status"] == "ok", startup
 assert startup["checks"][0]["name"] == "database_schema", startup
-assert "revision 0005" in startup["checks"][0]["detail"], startup
+assert "revision 0006" in startup["checks"][0]["detail"], startup
 assert ready["status"] == "ok", ready
 checks = {item["name"]: item["status"] for item in ready["checks"]}
 assert checks == {"database": "ok", "mcp": "ok", "a2a": "ok"}, checks
@@ -183,7 +183,7 @@ import sys
 
 payload = json.loads(pathlib.Path(sys.argv[1]).read_text())
 assert payload["status"] == "passed", payload
-assert payload["alembic_revision"] == "0005", payload
+assert payload["alembic_revision"] == "0006", payload
 assert payload["business_invariants"]["tenant-demo/C-102"] is True, payload
 print(
     "isolated PostgreSQL restore accepted: "

@@ -4,7 +4,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 
 这不是“几段 Prompt + 一个聊天页面”的示例。仓库交付 API、PostgreSQL、迁移、租户边界、幂等、审计、Outbox、MCP、状态机、检查点、工具账本、指标、容器和 CI；每项能力都要有可运行证据。
 
-## 当前里程碑：Slice 5
+## 当前里程碑：Slice 6
 
 第 1 章的 Slice 0 保留为确定性基线：它只看到 C-102 已结构化的两个材料代码，因此判断缺少事故证明。
 
@@ -54,6 +54,18 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 7. OutputGuard 会最小化邮箱与手机号，并阻断合成 canary secret 和未获准的受限数据；
 8. 11 个红队样例与一条真实恶意协作目标共同验证零越权副作用、零 canary 泄漏。
 
+第 7 章的 Slice 6 把前六章能力合龙为一个可验收的分层系统：
+
+1. Central Supervisor 先提交经过环检测的类型化 DAG，不靠自由文本记录依赖；
+2. Context Team 产出受治理的 Context Pack，Collaboration Team 通过真实 A2A → MCP 链调度三个专业节点；
+3. Team Supervisor 持有团队内收敛权，Central Supervisor 只消费已验收的团队 Artifact；
+4. 系统级 Reducer 确定性核对规则版本、材料状态、风险门禁、证据绑定和只读边界；
+5. `system_runs` 与 `system_steps` 持久化父子运行、依赖、尝试次数、结果引用和摘要；
+6. Runtime Context Graph 把 Goal、Plan、Step、Task、Context Pack、Claim、Evidence、Acceptance 与 Result 连成可查询的来源图；
+7. 图中只保存引用、分类和摘要，不复制原始 Prompt 或业务载荷；
+8. 同一幂等键可安全重放，失败运行可复用已完成的子运行继续收敛；
+9. C-102 通过全部 7 项系统检查，因风险规则进入人工复核，且 `side_effect=none`。
+
 模型不拥有执行权，专业 Agent 不拥有全局收敛权，检索器也不能决定什么可以进入模型。当前默认验收完全确定性，不用模型随机性伪装控制面、运行保证或安全策略的正确性。
 
 ## 一键运行
@@ -66,7 +78,7 @@ CaseOps 是《生产级多智能体系统：从架构判断到工程落地》的
 ```bash
 docker compose up --build -d
 docker compose ps
-make acceptance-chapter-06
+make acceptance-chapter-07
 ```
 
 如需同时启动 Collector、Tempo、Prometheus 与 Grafana：
@@ -135,6 +147,27 @@ curl --fail-with-body \
 
 完整的 Trace、SLO、故障降级与恢复验证见 [第 5 章运行手册](docs/chapter-05-runbook.md)。
 安全控制、红队样例与审计查询见 [第 6 章运行手册](docs/chapter-06-runbook.md)。
+分层合龙、系统验收与 Runtime Context Graph 见 [第 7 章运行手册](docs/chapter-07-runbook.md)。
+
+手工发起系统级合龙运行：
+
+```bash
+curl --fail-with-body \
+  --request POST \
+  http://localhost:8080/v1/cases/C-102/system-runs \
+  --header 'Content-Type: application/json' \
+  --header 'X-API-Key: caseops-local-dev-key' \
+  --header 'Idempotency-Key: book-ch07-c102-0001' \
+  --data '{
+    "goal":"合并上下文调查与多专业协作结论，对 C-102 执行系统级一致性验收。",
+    "question":"本案适用什么规则，材料是否满足要求，是否触发人工风险复核？",
+    "as_of":"2026-07-23T12:00:00+08:00",
+    "evidence_token_budget":1800,
+    "max_rounds":2
+  }'
+```
+
+成功响应会返回 `context_graph_uri`。使用同一 API Key 读取该 URI，可以检查每条最终 Claim 的 `SUPPORTED_BY` 证据边。
 
 ## 控制面
 
@@ -252,6 +285,7 @@ make security
 - Prometheus SLO 规则、依赖降级和 PostgreSQL 隔离恢复演练。
 - ToolGuard 权限交集、Manifest 漂移、跨资源、purpose、kill switch 与未知工具回归；
 - PII 最小化、canary 外泄阻断和真实间接提示注入隔离验收。
+- 系统 DAG、父子运行、跨团队一致性验收、来源图完整性和系统级幂等重放。
 
 ## 设计文档
 
@@ -262,11 +296,13 @@ make security
 - [ADR-0004：Context Pack 是受治理的证据产品](docs/adr/0004-context-pack-is-a-governed-evidence-product.md)
 - [ADR-0005：把生产级定义为可执行的运行保证](docs/adr/0005-production-is-an-executable-runtime-guarantee.md)
 - [ADR-0006：有效权限取用户、工作负载与委托权限的交集](docs/adr/0006-authority-is-an-intersection-not-a-model-judgment.md)
+- [ADR-0007：系统合龙使用确定性验收与运行时来源图](docs/adr/0007-system-convergence-needs-deterministic-acceptance.md)
 - [第 2 章运行与验收手册](docs/chapter-02-runbook.md)
 - [第 3 章运行与验收手册](docs/chapter-03-runbook.md)
 - [第 4 章运行与验收手册](docs/chapter-04-runbook.md)
 - [第 5 章运行与恢复验收手册](docs/chapter-05-runbook.md)
 - [第 6 章安全与红队验收手册](docs/chapter-06-runbook.md)
+- [第 7 章分层合龙与 Context Graph 验收手册](docs/chapter-07-runbook.md)
 
 ## “生产级”的准确含义
 
@@ -292,7 +328,7 @@ make security
 | 第 4 章 | Context Pipeline、RAG 2.0、GraphRAG | 来源、新鲜度与检索评测 |
 | 第 5 章 | 部署、遥测、恢复与平台化 | SLO、故障演练和恢复报告 |
 | 第 6 章 | ToolGuard、权限交集、隐私与安全审计 | 11 项红队、注入隔离与零越权副作用 |
-| 第 7 章 | 分层多 Agent 系统合龙 | C-102 全链路追踪 |
+| 第 7 章 | 分层 DAG、团队合龙、系统验收与 Runtime Context Graph | 7 项一致性检查、来源图与幂等重放 |
 | 第 8 章 | Golden Dataset 与持续回归 | 分层评测报告 |
 | 第 9 章 | AgentOps、事件诊断与成本治理 | 运营看板与 Runbook |
 | 第 10 章 | 系统验收与开源发布 | 发布包、SBOM 与验收报告 |

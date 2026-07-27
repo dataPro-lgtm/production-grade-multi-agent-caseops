@@ -21,6 +21,7 @@ from caseops.errors import (
     DataContractError,
     IdempotencyConflict,
     PolicyNotFound,
+    SystemRunNotFound,
 )
 from caseops.logging_config import configure_logging
 from caseops.platform.runtime_envelope import (
@@ -100,7 +101,9 @@ def create_app(
             "deadlines, dependency-aware readiness, OpenTelemetry, SLO rules, "
             "and verified PostgreSQL recovery; Slice 5 adds deterministic Tool "
             "Guard policy, privacy release controls, security decision audit, "
-            "and red-team regression."
+            "and red-team regression; Slice 6 adds a validated system DAG, "
+            "hierarchical team convergence, deterministic cross-team acceptance, "
+            "and a queryable runtime Context Graph."
         ),
         lifespan=lifespan,
     )
@@ -192,6 +195,7 @@ def create_app(
             AuthenticationFailed: (status.HTTP_401_UNAUTHORIZED, "Unauthorized"),
             CaseNotFound: (status.HTTP_404_NOT_FOUND, "Case not found"),
             PolicyNotFound: (status.HTTP_409_CONFLICT, "Policy unavailable"),
+            SystemRunNotFound: (status.HTTP_404_NOT_FOUND, "System run not found"),
             IdempotencyConflict: (status.HTTP_409_CONFLICT, "Idempotency conflict"),
             ActionNotAllowed: (
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
